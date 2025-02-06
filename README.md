@@ -41,9 +41,10 @@ Create a .env file in the root of the project directory.
 
 In the .env file, add your Discord bot token:
 
-``
+```
 DISCORD_TOKEN=your_discord_token_here
-``
+```
+
 Replace your_discord_token_here with your actual Discord bot token.
 
 Make sure your bot has the necessary permissions on your Discord server (sending messages, reading message history, etc.).
