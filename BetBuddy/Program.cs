@@ -81,20 +81,30 @@ namespace ForexCastBot
             await discord.ConnectAsync();
             await Task.Delay(5000); // Wait for the bot to connect
 
-            var activity = new DiscordActivity("your losses 💸", ActivityType.Watching);
-            await discord.UpdateStatusAsync(activity, UserStatus.Online);
+            var activities = new List<DiscordActivity>
+            {
+                new DiscordActivity("your losses 💸", ActivityType.Watching),
+                new DiscordActivity("your debt 📻", ActivityType.ListeningTo),
+                new DiscordActivity("the odds 🤫", ActivityType.Playing),
+                new DiscordActivity("bad bets 📉", ActivityType.Watching),
+                //new DiscordActivity("against luck 🍀", ActivityType.Competing)
+            };
 
-            // check for the bot's status
-            Console.WriteLine("🎮 Nastavená aktivita: " + activity.Name);
-            Console.WriteLine("📡 Aktuální status: " + discord.CurrentUser.Presence?.Status);
-            Console.WriteLine("✅ Přítomnost: " + (discord.CurrentUser.Presence?.Activity?.Name ?? "Žádná aktivita"));
+            int index = 0;
 
+            while (true) // infinite loop for changing activities
+            {
+                var activity = activities[index];
+                await discord.UpdateStatusAsync(activity, UserStatus.Online);
 
-            await Task.Delay(-1);
+         
+
+                index = (index + 1) % activities.Count; // Move to the next activity
+                await Task.Delay(9000); //  wait
+            }
         }
     }
-
-    public class BotCommands : BaseCommandModule
+        public class BotCommands : BaseCommandModule
     {
         private static readonly HttpClient client = new HttpClient();
 
