@@ -10,6 +10,7 @@ using System.Data.SQLite;
 using System.IO;
 using dotenv.net;
 using System.Numerics;
+using DSharpPlus.Entities;
 
 
 /*
@@ -69,7 +70,9 @@ namespace ForexCastBot
 
             var commands = discord.UseCommandsNext(new CommandsNextConfiguration()
             {
-                StringPrefixes = new[] { "bb " }
+                StringPrefixes = new[] { "bb " },
+                IgnoreExtraArguments = true,
+                EnableDefaultHelp = false
             });
 
             commands.RegisterCommands<BotCommands>();
@@ -83,7 +86,24 @@ namespace ForexCastBot
     {
         private static readonly HttpClient client = new HttpClient();
 
-        ulong adminId = 409818422344417293;  // Zde zadej správné admin ID (např. Discord ID administrátora)
+        ulong adminId = 409818422344417293;  // Admin ID
+
+
+        [Command("help")]
+        public async Task Help(CommandContext ctx)
+        {
+            var embed = new DiscordEmbedBuilder
+            {
+                Title = "📜 Available Commands",
+                Color = DiscordColor.Azure
+            }
+            .AddField("💰 Economy", "`bb money` - Check your balance\n`bb daily` - Claim your daily reward\n`bb work` - Claim your work reward\n`bb leaderboard` - Check top 10 richest players")
+            .AddField("🎮 Games", "`bb rps <choice> <bet>` - Rock Paper Scissors\n`bb cf <bet>` - Coin Flip")
+            .AddField("🎟 Lottery", "`bb lottery <amount>` - Join the lottery");
+            
+
+            await ctx.RespondAsync(embed);
+        }
 
         // Command to view the player's balance
         [Command("money")]
@@ -95,7 +115,7 @@ namespace ForexCastBot
             await ctx.RespondAsync($"💰 {username}, your current balance is: **{balance}** coins.");
         }
 
-        // Command to add money to a player's balance
+        // Command to add money to a player's balance (admin only)
         [Command("addmoney")]
         public async Task AddMoney(CommandContext ctx, string playerUsername, long amount)
         {
@@ -128,6 +148,12 @@ namespace ForexCastBot
             long playerBalance = await db.GetBalanceAsync(username);
             long bet;
 
+            bool playerExists = await db.PlayerExistsAsync(username);
+            if (!playerExists)
+            {
+                await db.AddPlayerAsync(username);
+            }
+
             if (betString == "all")
             {
                 bet = playerBalance;
@@ -138,7 +164,7 @@ namespace ForexCastBot
                 return;
             }
 
-            if (playerBalance < bet)
+            if (playerBalance < bet|| playerBalance == 0)
             {
                 await ctx.RespondAsync($"⚠️ {username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
                 return;
@@ -161,7 +187,7 @@ namespace ForexCastBot
             await db.UpdateBalanceAsync(username, playerBalance);
         }
 
-        // Command to enter the lottery
+
         // Command to show current lottery participants and total amount
         // Command to enter the lottery and show the current participants
         [Command("lottery")]
@@ -171,30 +197,45 @@ namespace ForexCastBot
             Database db = new Database();
 
             string participantsMessage = "";
+            long playerBalance = await db.GetBalanceAsync(username);
+            long bet=0;
+
+            bool playerExists = await db.PlayerExistsAsync(username);
+            if (!playerExists)
+            {
+                await db.AddPlayerAsync(username);
+            }
+
             // if there is a bet amount, add the user to the lottery
             if (amount != null)
             {
-                if (!long.TryParse(amount, out long betAmount) || betAmount <= 0)
+                if (amount == "all")
+                {
+                    bet = playerBalance;
+                }
+                else if (!long.TryParse(amount, out long betAmount) || betAmount <= 0)
                 {
                     await ctx.RespondAsync("⚠️ Please enter a valid amount greater than zero.");
                     return;
+                }else
+                {
+                    bet = betAmount;
                 }
 
-                // Check if the user has enough coins to bet
-                long balance = await db.GetBalanceAsync(username);
-                if (balance < betAmount)
+
+                if (playerBalance < bet)
                 {
-                    await ctx.RespondAsync($"⚠️ {username}, you don't have enough coins to bet that amount. Your current balance is **{balance}** coins.");
+                    await ctx.RespondAsync($"⚠️ {username}, you don't have enough coins to bet that amount. Your current balance is **{playerBalance}** coins.");
                     return;
                 }
 
                 // Add the user to the lottery
-                await db.AddLotteryEntryAsync(username, betAmount);
+                await db.AddLotteryEntryAsync(username, bet);
 
                 // Update the user's balance
-                await db.UpdateBalanceAsync(username, balance - betAmount);
+                await db.UpdateBalanceAsync(username, playerBalance - bet);
 
-                participantsMessage += ($"✅ {username}, you have successfully entered the lottery with **{betAmount}** coins.\n");
+                participantsMessage += ($"✅ {username}, you have successfully entered the lottery with **{bet}** coins.\n");
             }
 
             // Get all lottery entries
@@ -208,7 +249,7 @@ namespace ForexCastBot
             }
 
             // Create a message with all participants and their chances
-            participantsMessage += "🎉 Current Lottery Participants:\n";
+            participantsMessage += $"🎉 Current Lottery Participants **({entries.Count}/5)**:\n";
             foreach (var entry in entries)
             {
                 double chance = (double)entry.Amount / totalAmount * 100;
@@ -294,12 +335,17 @@ namespace ForexCastBot
             await db.DeleteOldLotteryEntriesAsync(DateTime.UtcNow);
         }
 
-
         [Command("daily")]
         public async Task Daily(CommandContext ctx)
         {
             string username = ctx.User.Username;
             Database db = new Database();
+            
+            if(!await db.PlayerExistsAsync(username))
+            {
+                await db.AddPlayerAsync(username);
+            }
+
 
             DateTime? lastClaimed = await db.GetLastClaimedAsync(username);
             DateTime today = DateTime.UtcNow.Date; // Today's date
@@ -331,6 +377,11 @@ namespace ForexCastBot
             string username = ctx.User.Username;
             Database db = new Database();
             long currentBalance = await db.GetBalanceAsync(username);
+
+            if (!await db.PlayerExistsAsync(username))
+            {
+                await db.AddPlayerAsync(username);
+            }
 
             if (currentBalance == 0)
             {
@@ -364,6 +415,11 @@ namespace ForexCastBot
             // get player balance
             long playerBalance = await db.GetBalanceAsync(username);
 
+            if (!await db.PlayerExistsAsync(username))
+            {
+                await db.AddPlayerAsync(username);
+            }
+
             if (betString == "all")
             {
                 bet = playerBalance;
@@ -375,7 +431,7 @@ namespace ForexCastBot
             }
             else
             {
-                
+
                 bet = bett;
             }
 
@@ -443,9 +499,14 @@ namespace ForexCastBot
         public async Task Leaderboard(CommandContext ctx)
         {
             Database db = new Database();
-
+            string username = ctx.User.Username;
             // Získání všech top hráčů
             var topPlayers = await db.GetTopPlayersAsync();
+
+            if (!await db.PlayerExistsAsync(username))
+            {
+                await db.AddPlayerAsync(username);
+            }
 
             if (topPlayers.Count == 0)
             {
@@ -469,10 +530,10 @@ namespace ForexCastBot
         [Command("removeplayer")]
         public async Task RemovePlayer(CommandContext ctx, string playerUsername)
         {
-            // Zde nastavíme ID administrátora (toto ID bude moci provádět operaci odstranění)
-            
 
-            // Zkontroluj, zda má uživatel správné ID
+
+
+            // check if user has admin permissions
             if (ctx.User.Id != adminId)
             {
                 await ctx.RespondAsync("⚠️ You do not have permission to perform this action.");
@@ -481,7 +542,7 @@ namespace ForexCastBot
 
             Database db = new Database();
 
-            // Zkontroluj, zda hráč existuje v databázi
+            // check if player exists
             bool playerExists = await db.PlayerExistsAsync(playerUsername);
             if (!playerExists)
             {
@@ -489,10 +550,25 @@ namespace ForexCastBot
                 return;
             }
 
-            // Odstranění hráče z databáze
+            // remove player
             await db.RemovePlayerAsync(playerUsername);
 
             await ctx.RespondAsync($"✅ Player **{playerUsername}** has been successfully removed from the database.");
+        }
+
+
+        [Command("printplayers")]
+        public async Task printPlayers(CommandContext ctx)
+        {
+            // check if user has admin permissions
+            if (ctx.User.Id != adminId)
+            {
+                await ctx.RespondAsync("⚠️ You do not have permission to perform this action.");
+                return;
+            }
+
+            Database db = new Database();
+            await db.PrintPlayersAsync();
         }
     }
 }

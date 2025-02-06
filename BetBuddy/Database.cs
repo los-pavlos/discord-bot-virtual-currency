@@ -243,7 +243,7 @@ public class Database
         {
             await connection.OpenAsync();
 
-            // Vykonáme SQL dotaz pro odstranění hráče
+            // Remove player from the Players table
             var command = new SQLiteCommand("DELETE FROM Players WHERE Username = @username", connection);
             command.Parameters.AddWithValue("@username", username);
 
@@ -256,6 +256,32 @@ public class Database
             else
             {
                 Console.WriteLine($"No player found with username {username}.");
+            }
+        }
+    }
+
+    public async Task PrintPlayersAsync()
+    {
+        using (var connection = new SQLiteConnection(connectionString))
+        {
+
+            // print all players and lottery entries from the database to the console
+            await connection.OpenAsync();
+
+            var commands = new List<SQLiteCommand>();
+            commands.Add(new SQLiteCommand("SELECT * FROM Players", connection));
+            commands.Add(new SQLiteCommand("SELECT * FROM LotteryEntries", connection));
+            Console.WriteLine("Players:");
+            foreach (var command in commands)
+            {
+                var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var values = new object[reader.FieldCount];
+                    reader.GetValues(values);
+                    Console.WriteLine(string.Join(", ", values));
+                }
+
             }
         }
     }
