@@ -218,4 +218,45 @@ public class Database
             return result == DBNull.Value ? 0 : Convert.ToInt64(result);
         }
     }
+
+    public async Task<List<(string Username, long Balance)>> GetTopPlayersAsync()
+    {
+        using (var connection = new SQLiteConnection(connectionString))
+        {
+            await connection.OpenAsync();
+            var command = new SQLiteCommand("SELECT Username, Balance FROM Players ORDER BY Balance DESC LIMIT 10", connection);
+            var reader = await command.ExecuteReaderAsync();
+
+            var players = new List<(string Username, long Balance)>();
+            while (await reader.ReadAsync())
+            {
+                players.Add((reader.GetString(0), reader.GetInt64(1)));
+            }
+
+            return players;
+        }
+    }
+
+    public async Task RemovePlayerAsync(string username)
+    {
+        using (var connection = new SQLiteConnection(connectionString))
+        {
+            await connection.OpenAsync();
+
+            // Vykonáme SQL dotaz pro odstranění hráče
+            var command = new SQLiteCommand("DELETE FROM Players WHERE Username = @username", connection);
+            command.Parameters.AddWithValue("@username", username);
+
+            int rowsAffected = await command.ExecuteNonQueryAsync();
+
+            if (rowsAffected > 0)
+            {
+                Console.WriteLine($"Successfully removed player {username} from the database.");
+            }
+            else
+            {
+                Console.WriteLine($"No player found with username {username}.");
+            }
+        }
+    }
 }

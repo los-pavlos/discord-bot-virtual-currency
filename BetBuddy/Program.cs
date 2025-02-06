@@ -9,6 +9,7 @@ using Newtonsoft.Json.Linq;
 using System.Data.SQLite;
 using System.IO;
 using dotenv.net;
+using System.Numerics;
 
 
 /*
@@ -81,6 +82,8 @@ namespace ForexCastBot
     public class BotCommands : BaseCommandModule
     {
         private static readonly HttpClient client = new HttpClient();
+
+        ulong adminId = 409818422344417293;  // Zde zadej správné admin ID (např. Discord ID administrátora)
 
         // Command to view the player's balance
         [Command("money")]
@@ -160,6 +163,7 @@ namespace ForexCastBot
 
         // Command to enter the lottery
         // Command to show current lottery participants and total amount
+        // Command to enter the lottery and show the current participants
         [Command("lottery")]
         public async Task Lottery(CommandContext ctx, string? amount = null)
         {
@@ -213,15 +217,36 @@ namespace ForexCastBot
 
             participantsMessage += $"Total Lottery Pool: **{totalAmount}** coins.";
             await ctx.RespondAsync(participantsMessage);
+
+            // Check if there are 5 participants, if so, automatically trigger the draw
+            if (entries.Count >= 5)
+            {
+                await DrawLotteryAutomatically(ctx);
+            }
         }
 
+        // Command to manually draw the lottery (admin only)
         [Command("drawlottery")]
         public async Task DrawLottery(CommandContext ctx)
+        {
+            // Zkontroluj, zda má uživatel správné ID (admin ID)
+            if (ctx.User.Id != adminId)
+            {
+                await ctx.RespondAsync("⚠️ You do not have permission to perform this action.");
+                return;
+            }
+
+            // Zavolání metody pro losování, pokud je admin
+            await DrawLotteryAutomatically(ctx);
+        }
+
+        // Automatically draw the lottery when there are enough participants or triggered manually
+        public async Task DrawLotteryAutomatically(CommandContext ctx)
         {
             string username = ctx.User.Username;
             Database db = new Database();
 
-            // get all lottery entries
+            // Get all lottery entries
             var entries = await db.GetLotteryEntriesAsync();
             if (entries.Count == 0)
             {
@@ -229,21 +254,21 @@ namespace ForexCastBot
                 return;
             }
 
-            // calculate the total amount of coins in the lottery
+            // Calculate the total amount of coins in the lottery
             long totalAmount = 0;
             foreach (var entry in entries)
             {
                 totalAmount += entry.Amount;
             }
 
-            // choose a random winner based on a random number
+            // Choose a random winner based on a random number
             Random random = new Random();
             long randomNumber = random.Next(0, (int)totalAmount);
 
-            // find the winner based on the random number
+            // Find the winner based on the random number
             long accumulatedAmount = 0;
             string winner = "";
-            long winnerAmount = 0; // We'll store the winner's amount here for later calculation
+            long winnerAmount = 0; // Store the winner's amount here for later calculation
             foreach (var entry in entries)
             {
                 accumulatedAmount += entry.Amount;
@@ -261,15 +286,14 @@ namespace ForexCastBot
             // Announce the winner
             await ctx.RespondAsync($"🎉 The winner of the **{totalAmount}** coin lottery is **{winner}**! Congratulations!\n📊 Winner had **{winnerChance:F2}%** chance of winning");
 
-
-
             // Add the total amount to the winner's balance
             long currentBalance = await db.GetBalanceAsync(winner);
             await db.UpdateBalanceAsync(winner, currentBalance + totalAmount);
 
-            // Clear the lottery entries
+            // Clear the lottery entries after the draw
             await db.DeleteOldLotteryEntriesAsync(DateTime.UtcNow);
         }
+
 
         [Command("daily")]
         public async Task Daily(CommandContext ctx)
@@ -415,6 +439,60 @@ namespace ForexCastBot
             await ctx.RespondAsync(message);
         }
 
+        [Command("leaderboard")]
+        public async Task Leaderboard(CommandContext ctx)
+        {
+            Database db = new Database();
 
+            // Získání všech top hráčů
+            var topPlayers = await db.GetTopPlayersAsync();
+
+            if (topPlayers.Count == 0)
+            {
+                await ctx.RespondAsync("⚠️ There are no players with a balance yet.");
+                return;
+            }
+
+            // Vytvoření zprávy pro leaderboard
+            string leaderboardMessage = "🏆 **Leaderboard - Top 10 Richest Players** 🏆\n";
+            int rank = 1;
+            foreach (var player in topPlayers)
+            {
+                leaderboardMessage += $"{rank}. **{player.Username}**: {player.Balance} coins\n";
+                rank++;
+                if (rank > 10) break; // Zobrazíme pouze top 10 hráčů
+            }
+
+            await ctx.RespondAsync(leaderboardMessage);
+        }
+
+        [Command("removeplayer")]
+        public async Task RemovePlayer(CommandContext ctx, string playerUsername)
+        {
+            // Zde nastavíme ID administrátora (toto ID bude moci provádět operaci odstranění)
+            
+
+            // Zkontroluj, zda má uživatel správné ID
+            if (ctx.User.Id != adminId)
+            {
+                await ctx.RespondAsync("⚠️ You do not have permission to perform this action.");
+                return;
+            }
+
+            Database db = new Database();
+
+            // Zkontroluj, zda hráč existuje v databázi
+            bool playerExists = await db.PlayerExistsAsync(playerUsername);
+            if (!playerExists)
+            {
+                await ctx.RespondAsync($"⚠️ Player **{playerUsername}** does not exist in the database.");
+                return;
+            }
+
+            // Odstranění hráče z databáze
+            await db.RemovePlayerAsync(playerUsername);
+
+            await ctx.RespondAsync($"✅ Player **{playerUsername}** has been successfully removed from the database.");
+        }
     }
 }
