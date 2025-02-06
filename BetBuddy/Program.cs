@@ -20,6 +20,15 @@ namespace ForexCastBot
     {
         static async Task Main(string[] args)
         {
+
+            /*
+             * 1. Přidejte NuGet balíček DSharpPlus
+             * 2. Přidejte NuGet balíček DSharpPlus.CommandsNext
+             * 3. Přidejte NuGet balíček Newtonsoft.Json
+             * 4. Přidejte NuGet balíček dotenv.net
+             * 5. vytvořte soubor .env v kořenovém adresáři projektu a vložte svůj Discord token ve formátu DISCORD_TOKEN=your_token_here
+             */
+
             // Explicitně načítáme .env a vyhodíme chybu, pokud se nepodaří
             DotEnv.Load(options: new DotEnvOptions(ignoreExceptions: false));
 
@@ -31,7 +40,7 @@ namespace ForexCastBot
                 return;
             }
 
-            Console.WriteLine("✅ Token úspěšně načten: " + token.Substring(0, 5) + "*****"); // Pro kontrolu, ale neukazuj celý token!
+            Console.WriteLine("✅ Token úspěšně načten: " + token.Substring(0, 5) + "*****");
 
             var discord = new DiscordClient(new DiscordConfiguration()
             {
@@ -43,7 +52,7 @@ namespace ForexCastBot
 
             var commands = discord.UseCommandsNext(new CommandsNextConfiguration()
             {
-                StringPrefixes = new[] { "bb " } // Bot reaacts for commands starting with "!"
+                StringPrefixes = new[] { "bb " } // Bot reaacts for commands starting with "bb"
             });
 
             commands.RegisterCommands<BotCommands>();
@@ -219,7 +228,7 @@ namespace ForexCastBot
 
             if (!playerExists)
             {
-                await db.AddPlayerAsync(playerUsername); // Vytvoříme nového hráče
+                await db.AddPlayerAsync(playerUsername); // Vytvoření nového hráče, pokud neexistuje
             }
 
             // Získáme aktuální zůstatek hráče
@@ -293,7 +302,7 @@ namespace ForexCastBot
                 bet = int.Parse(betString);
             }
 
-            // Zkontroluj, zda hráč má dost peněz na sázení
+            // Zkontroluje, zda hráč má dost peněz na sázení
             if (playerBalance < bet)
             {
                 await ctx.RespondAsync($"⚠️ {username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
