@@ -77,7 +77,19 @@ namespace ForexCastBot
 
             commands.RegisterCommands<BotCommands>();
 
+
             await discord.ConnectAsync();
+            await Task.Delay(5000); // Wait for the bot to connect
+
+            var activity = new DiscordActivity("your losses 💸", ActivityType.Watching);
+            await discord.UpdateStatusAsync(activity, UserStatus.Online);
+
+            // check for the bot's status
+            Console.WriteLine("🎮 Nastavená aktivita: " + activity.Name);
+            Console.WriteLine("📡 Aktuální status: " + discord.CurrentUser.Presence?.Status);
+            Console.WriteLine("✅ Přítomnost: " + (discord.CurrentUser.Presence?.Activity?.Name ?? "Žádná aktivita"));
+
+
             await Task.Delay(-1);
         }
     }
