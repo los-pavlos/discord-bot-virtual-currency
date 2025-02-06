@@ -3,16 +3,20 @@
 This is a Discord bot that allows users to play games and earn virtual currency within a server. Users can check their balance, participate in the lottery, claim daily rewards, work for coins, and enjoy classic games like rock-paper-scissors and coin flip. The bot utilizes SQLite to store user data.
 
 ## Features
-
-- **bb money**: Check your balance.
-- **bb addmoney `<player>` `<amount>`**: Add money to a player's balance (admin command).
-- **bb cf `<bet>`**: Play coin flip with a specified bet.
-- **bb lottery `[amount]`**: Enter the lottery or view current participants.
-- **bb drawlottery**: Draw the lottery winner.
+#### Economics
 - **bb daily**: Claim your daily reward (earn coins).
 - **bb work**: Work to earn coins (random reward).
+- **bb money**: Check your balance.
+
+#### Gamble
+- **bb cf `<bet>`**: Play coin flip with a specified bet.
+- **bb lottery `[amount]`**: Enter the lottery or view current participants.
 - **bb rps `<choice>` `<bet>`**: Play rock-paper-scissors (choose rock, paper, or scissors and place a bet).
 
+#### Admin commands
+- **bb addmoney `<player>` `<amount>`**: Add money to a player's balance.
+- **bb drawlottery**: Draw the lottery winner.
+  
 ## Installation
 
 ### Prerequisites
