@@ -84,11 +84,12 @@ namespace ForexCastBot
             var activities = new List<DiscordActivity>
             {
                 new DiscordActivity("lottery status", ActivityType.Watching),
-                new DiscordActivity("your losses 💸", ActivityType.Watching),
-                new DiscordActivity("your debt 📻", ActivityType.ListeningTo),
                 new DiscordActivity("Server status", ActivityType.Playing),
-                new DiscordActivity("the odds 🤫", ActivityType.Playing),
-                new DiscordActivity("bad bets 📉", ActivityType.Watching),
+                //new DiscordActivity("your losses 💸", ActivityType.Watching),
+                //new DiscordActivity("your debt 📻", ActivityType.ListeningTo),
+                
+                //new DiscordActivity("the odds 🤫", ActivityType.Playing),
+                //new DiscordActivity("bad bets 📉", ActivityType.Watching),
                 
 
             };
@@ -104,14 +105,23 @@ namespace ForexCastBot
                 Database db = new Database();
                 var entries = await db.GetLotteryEntriesAsync();
                 var totalAmount = await db.GetTotalLotteryAmountAsync();
-                activities[0] = new DiscordActivity($"the lottery 🎰 ({entries.Count}/5) - {totalAmount} coins", ActivityType.Watching);
+                var entriesCount = entries.Count;
+                if (entriesCount == 0)
+                {
+                    activities[0] = new DiscordActivity($"there is not lottery in progress", ActivityType.Watching);
+                }
+                else
+                {
+                    activities[0] = new DiscordActivity($"the lottery 🎰 ({entries.Count}/5) - {totalAmount} coins", ActivityType.Watching);
+                }
+
                 int serverCount = discord.Guilds.Count;
                 
-                activities[3] = new DiscordActivity($"on {serverCount} servers! 🌍", ActivityType.Playing);
+                activities[1] = new DiscordActivity($"on {serverCount} servers! 🌍", ActivityType.Playing);
 
 
                 index = (index + 1) % activities.Count; // Move to the next activity
-                await Task.Delay(10000); //  wait
+                await Task.Delay(90000); //  wait
             }
         }
     }
@@ -131,7 +141,7 @@ namespace ForexCastBot
                 Color = DiscordColor.Azure
             }
             .AddField("💰 Economy", "`bb money` - Check your balance\n`bb daily` - Claim your daily reward\n`bb work` - Claim your work reward\n`bb leaderboard` - Check top 10 richest players")
-            .AddField("🎮 Games", "`bb rps <choice> <bet>` - Rock Paper Scissors\n`bb cf <bet>` - Coin Flip")
+            .AddField("🎮 Games", "`bb rps <choice> <bet>` - Rock Paper Scissors\n`bb cf <bet>` - Coin Flip\n`bb roulette <choice> <bet>` - Roulette")
             .AddField("🎟 Lottery", "`bb lottery <amount>` - Join the lottery");
             
 
@@ -603,5 +613,90 @@ namespace ForexCastBot
             Database db = new Database();
             await db.PrintPlayersAsync();
         }
+
+        [Command("roulette")]
+        public async Task Roulette(CommandContext ctx, string betType, string betAmountString)
+        {
+            string username = ctx.User.Username;
+            Database db = new Database();
+            long playerBalance = await db.GetBalanceAsync(username);
+            long betAmount;
+
+            // Pokud hráč neexistuje v databázi, přidáme ho
+            bool playerExists = await db.PlayerExistsAsync(username);
+            if (!playerExists)
+            {
+                await db.AddPlayerAsync(username);
+            }
+
+            // Pokud hráč zadá "all", vsadí celý svůj balance
+            if (betAmountString == "all")
+            {
+                betAmount = playerBalance;
+            }
+            else if (!long.TryParse(betAmountString, out betAmount) || betAmount <= 0)
+            {
+                await ctx.RespondAsync("⚠️ Please enter a valid bet amount greater than zero.");
+                return;
+            }
+
+            // Kontrola, jestli hráč má dost peněz na sázku
+            if (playerBalance < betAmount || playerBalance == 0)
+            {
+                await ctx.RespondAsync($"⚠️ {username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
+                return;
+            }
+
+            // Vytvoření číselníku pro barvy rulety
+            var colors = new Dictionary<int, string>()
+    {
+        {0, "green"}, {1, "red"}, {2, "black"}, {3, "red"}, {4, "black"}, {5, "red"}, {6, "black"},
+        {7, "red"}, {8, "black"}, {9, "red"}, {10, "black"}, {11, "black"}, {12, "red"}, {13, "black"},
+        {14, "red"}, {15, "black"}, {16, "red"}, {17, "black"}, {18, "red"}, {19, "red"}, {20, "black"},
+        {21, "red"}, {22, "black"}, {23, "red"}, {24, "black"}, {25, "red"}, {26, "black"}, {27, "red"},
+        {28, "black"}, {29, "black"}, {30, "red"}, {31, "black"}, {32, "red"}, {33, "black"}, {34, "red"},
+        {35, "black"}, {36, "red"}
+    };
+
+            betType = betType.ToLower();
+            bool isNumberBet = int.TryParse(betType, out int betNumber);
+
+            if (!isNumberBet && !new[] { "red", "black", "green" }.Contains(betType))
+            {
+                await ctx.RespondAsync("❌ Invalid bet! You can bet on a **color (red/black/green)** or a **number (0-36)**.");
+                return;
+            }
+
+            // Ruleta - generování náhodného čísla
+            Random rand = new Random();
+            int rolledNumber = rand.Next(37);
+            string rolledColor = colors[rolledNumber];
+
+            string resultMessage = $"🎡 The roulette wheel spins... **{rolledNumber}** ({rolledColor})! ";
+
+            if (isNumberBet && betNumber == rolledNumber)
+            {
+                long winnings = betAmount * 35;
+                playerBalance += winnings;
+                resultMessage += $"🎉 **Jackpot!** You win **{winnings}💰**!";
+            }
+            else if (!isNumberBet && betType == rolledColor)
+            {
+                long winnings = (betType == "green") ? betAmount * 35 : betAmount * 2;
+                playerBalance += winnings;
+                resultMessage += $"✅ You win **{winnings}💰**!";
+            }
+            else
+            {
+                playerBalance -= betAmount;
+                resultMessage += "❌ You lose!";
+            }
+
+            await db.UpdateBalanceAsync(username, playerBalance);
+            resultMessage += $" Your new balance: **{playerBalance}💰**.";
+
+            await ctx.RespondAsync(resultMessage);
+        }
+
     }
 }
