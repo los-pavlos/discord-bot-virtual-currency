@@ -83,11 +83,14 @@ namespace ForexCastBot
 
             var activities = new List<DiscordActivity>
             {
+                new DiscordActivity("lottery status", ActivityType.Watching),
                 new DiscordActivity("your losses 💸", ActivityType.Watching),
                 new DiscordActivity("your debt 📻", ActivityType.ListeningTo),
+                new DiscordActivity("Server status", ActivityType.Playing),
                 new DiscordActivity("the odds 🤫", ActivityType.Playing),
                 new DiscordActivity("bad bets 📉", ActivityType.Watching),
-                //new DiscordActivity("against luck 🍀", ActivityType.Competing)
+                
+
             };
 
             int index = 0;
@@ -97,10 +100,18 @@ namespace ForexCastBot
                 var activity = activities[index];
                 await discord.UpdateStatusAsync(activity, UserStatus.Online);
 
-         
+                /* Lottery and serverCounts status activity update */
+                Database db = new Database();
+                var entries = await db.GetLotteryEntriesAsync();
+                var totalAmount = await db.GetTotalLotteryAmountAsync();
+                activities[0] = new DiscordActivity($"the lottery 🎰 ({entries.Count}/5) - {totalAmount} coins", ActivityType.Watching);
+                int serverCount = discord.Guilds.Count;
+                
+                activities[3] = new DiscordActivity($"on {serverCount} servers! 🌍", ActivityType.Playing);
+
 
                 index = (index + 1) % activities.Count; // Move to the next activity
-                await Task.Delay(9000); //  wait
+                await Task.Delay(10000); //  wait
             }
         }
     }
