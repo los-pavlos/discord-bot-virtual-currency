@@ -16,8 +16,8 @@
 
 .env
 players.db
-
-
+players.db-shm
+players.db-wal
 
 
 # User-specific files (MonoDevelop/Xamarin Studio)

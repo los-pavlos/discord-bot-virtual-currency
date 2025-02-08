@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using Quartz.Util;
 
 public class Database
 {
@@ -88,10 +89,11 @@ public class Database
         using (var connection = new SQLiteConnection(connectionString))
         {
             await connection.OpenAsync();
-            var command = new SQLiteCommand("INSERT INTO Players (UserId, Username, Balance, LastClaimed) VALUES (@userId, @username, 100, NULL)", connection);
+            var command = new SQLiteCommand("INSERT INTO Players (UserId, Username, Balance, LastClaimed) VALUES (@userId, @username, 0, NULL)", connection);
             command.Parameters.AddWithValue("@userId", userId);
             command.Parameters.AddWithValue("@username", username);
             await command.ExecuteNonQueryAsync();
+            Console.WriteLine($"Added player {username} with UserId: {userId}");
         }
     }
 
@@ -194,22 +196,25 @@ public class Database
             await connection.OpenAsync();
 
             // check if the user already has an entry in the lottery
-            var checkCommand = new SQLiteCommand("SELECT Amount FROM LotteryEntries WHERE UserId = @UserId AND GuildId = @GuildId", connection);
+            var checkCommand = new SQLiteCommand("SELECT Amount, GuildId, ChannelId FROM LotteryEntries WHERE UserId = @UserId", connection);
             checkCommand.Parameters.AddWithValue("@UserId", userId);
-            checkCommand.Parameters.AddWithValue("@GuildId", guildId);
 
             var reader = await checkCommand.ExecuteReaderAsync();
 
-            if (await reader.ReadAsync()) // user already has an entry in the lottery for the specific guild
+            if (await reader.ReadAsync()) // user already has an entry in the lottery
             {
-                long currentAmount = reader.GetInt64(0);
+                long currentAmount = reader.GetInt64(0); // Correct usage for Amount
                 long newAmount = currentAmount + amount;
 
-                // update the amount
-                var updateCommand = new SQLiteCommand("UPDATE LotteryEntries SET Amount = @Amount WHERE UserId = @UserId AND GuildId = @GuildId", connection);
+                long currentGuildId = reader.GetInt64(1); // Use GetInt64 for GuildId
+                long currentChannelId = reader.GetInt64(2); // Use GetInt64 for ChannelId
+
+                // Update the amount, and update GuildId and ChannelId to the latest ones
+                var updateCommand = new SQLiteCommand("UPDATE LotteryEntries SET Amount = @Amount, GuildId = @GuildId, ChannelId = @ChannelId WHERE UserId = @UserId", connection);
                 updateCommand.Parameters.AddWithValue("@Amount", newAmount);
+                updateCommand.Parameters.AddWithValue("@GuildId", guildId); // Update with the new guild ID
+                updateCommand.Parameters.AddWithValue("@ChannelId", channelId); // Update with the new channel ID
                 updateCommand.Parameters.AddWithValue("@UserId", userId);
-                updateCommand.Parameters.AddWithValue("@GuildId", guildId);
 
                 await updateCommand.ExecuteNonQueryAsync();
             }
@@ -218,13 +223,15 @@ public class Database
                 var insertCommand = new SQLiteCommand("INSERT INTO LotteryEntries (UserId, Amount, GuildId, ChannelId) VALUES (@UserId, @Amount, @GuildId, @ChannelId)", connection);
                 insertCommand.Parameters.AddWithValue("@UserId", userId);
                 insertCommand.Parameters.AddWithValue("@Amount", amount);
-                insertCommand.Parameters.AddWithValue("@GuildId", guildId);
-                insertCommand.Parameters.AddWithValue("@ChannelId", channelId);
+                insertCommand.Parameters.AddWithValue("@GuildId", guildId); // Insert with guild ID
+                insertCommand.Parameters.AddWithValue("@ChannelId", channelId); // Insert with channel ID
 
                 await insertCommand.ExecuteNonQueryAsync();
             }
         }
     }
+
+
 
 
     public async Task<List<(ulong UserId, string Username, long Amount, ulong GuildId, ulong ChannelId)>> GetLotteryEntriesAsync()
@@ -253,7 +260,6 @@ public class Database
             return entries;
         }
     }
-
 
 
     public async Task RemovePlayerAsync(ulong userId)

@@ -54,7 +54,9 @@ namespace BetBuddy
         {
             DotEnv.Load(options: new DotEnvOptions(ignoreExceptions: false));
 
-            string? token = Environment.GetEnvironmentVariable("DISCORD_TOKEN");
+            // discord connection
+            
+                string? token = Environment.GetEnvironmentVariable("DISCORD_TOKEN");
 
             if (string.IsNullOrEmpty(token))
             {
@@ -77,27 +79,32 @@ namespace BetBuddy
                 IgnoreExtraArguments = true,
                 EnableDefaultHelp = false
             });
-
+            
             commands.RegisterCommands<BotCommands>();
 
-            //  Initialize the Quartz scheduler
+            // initialize the scheduler
             var schedulerFactory = new StdSchedulerFactory();
             var scheduler = await schedulerFactory.GetScheduler();
-            await scheduler.Start();
 
-            // Schedule the lottery job to run every day at 20:00
+            // set up the job factory
+            scheduler.JobFactory = new LotteryJobFactory(discord);
+
             IJobDetail job = JobBuilder.Create<LotteryJob>()
                 .WithIdentity("LotteryJob", "group1")
                 .Build();
 
             var trigger = TriggerBuilder.Create()
-                                  .WithIdentity("EverySecondTrigger", "Group1")
-                                  .WithCronSchedule("0 0 20 * * ?") // Every day at 20:00
-                                  .Build();
+                .WithIdentity("LotteryTrigger", "Group1")
+                .WithCronSchedule("0 0 20 * * ?")  // Cron expression for 20:00 (8:00 PM) daily
+                .Build();
+
 
             await scheduler.ScheduleJob(job, trigger);
+            Console.WriteLine("✅ LotteryJob naplánován!");
 
-            Console.WriteLine("Lottery job scheduled to run every day at 20:00.");
+            // Start the scheduler
+            await scheduler.Start();
+            Console.WriteLine("✅ Scheduler spuštěn!");
 
             await discord.ConnectAsync();
             await Task.Delay(5000); // Wait for the bot to connect
@@ -190,6 +197,7 @@ namespace BetBuddy
             Database db = new Database();
             long balance = await db.GetBalanceAsync(userId);
             await ctx.RespondAsync($"💰 <@{userId}>, your current balance is: **{balance}** coins.");
+            Console.WriteLine($"User {userId} checked their balance.");
         }
 
         [Command("addmoney")]
@@ -317,9 +325,9 @@ namespace BetBuddy
                 participantsMessage += $"- **{entry.Username}**: {entry.Amount} coins | **{chance:F2}%** chance\n";
             }
 
-            participantsMessage += $"Total Lottery Pool: **{totalAmount}** coins.\n";
             var timeRemaining = GetTimeRemainingUntilLottery();
-            participantsMessage += $"Winner drawn automatically in {timeRemaining}";
+            participantsMessage += $"Total Lottery Pool: **{totalAmount}** coins. ({timeRemaining} remaining)";
+            
             // Send message
             await ctx.RespondAsync(participantsMessage);
             Console.WriteLine("Participants message sent.");
@@ -354,6 +362,7 @@ namespace BetBuddy
                 await db.UpdateLastClaimedAsync(userId);
 
                 await ctx.RespondAsync($"🎉 {ctx.User.Username}, you claimed your daily reward of **{reward}** coins! New balance: **{newBalance}** coins.");
+                Console.WriteLine($"User {userId}: {username} claimed daily reward of {reward} coins.");
             }
             else
             {
@@ -384,6 +393,7 @@ namespace BetBuddy
                 await db.UpdateBalanceAsync(userId, newBalance);
 
                 await ctx.RespondAsync($"💼 **{ctx.User.Username}**, you worked hard and earned **{reward}** coins! ✨ Your new balance is: **{newBalance}** coins. 🏅");
+                Console.WriteLine("User {userId}: {username} worked and earned {reward} coins.");
             }
             else
             {
@@ -460,6 +470,7 @@ namespace BetBuddy
 
             // send result message
             await ctx.RespondAsync(resultMessage);
+            Console.WriteLine($"User {userId}: {username} played coinflip with {betAmount} coins");
         }
 
 
@@ -540,6 +551,7 @@ namespace BetBuddy
                              $"{result}\n" +
                              $"Your new balance is: **{playerBalance}** coins.";
             await ctx.RespondAsync(message);
+            Console.WriteLine($"User {userId}: {username} played rock-paper-scissors with {bet} coins");
         }
 
         [Command("leaderboard")]
@@ -571,6 +583,7 @@ namespace BetBuddy
             }
 
             await ctx.RespondAsync(leaderboardMessage);
+            Console.WriteLine($"User {userId}: {username} checked the leaderboard.");
         }
 
         [Command("removeplayer")]
@@ -594,6 +607,7 @@ namespace BetBuddy
             await db.RemovePlayerAsync(playerId);
 
             await ctx.RespondAsync($"✅ Player with ID **{playerId}** has been successfully removed from the database.");
+            Console.WriteLine($"Player with ID {playerId} has been removed from the database.");
         }
 
         [Command("roulette")]
@@ -675,11 +689,11 @@ namespace BetBuddy
             resultMessage += $" Your new balance: **{playerBalance}💰**.";
 
             await ctx.RespondAsync(resultMessage);
+            Console.WriteLine($"User {userId}: {username} played roulette with {betAmount} coins");
+
+            }
+
+
         }
-
-
-
-
-    }
 
 }

@@ -1,6 +1,5 @@
-﻿using DSharpPlus;  // Přidej tuto direktivu
-using DSharpPlus.Entities;  // Pro přístup k DiscordUser
-
+﻿using DSharpPlus;
+using DSharpPlus.Entities;
 using Quartz;
 using System;
 using System.Collections.Generic;
@@ -12,7 +11,6 @@ namespace BetBuddy
     {
         private readonly DiscordClient _discord;
 
-        // Konstruktor přijímající DiscordClient
         public LotteryJob(DiscordClient discord)
         {
             _discord = discord;
@@ -25,17 +23,13 @@ namespace BetBuddy
             var db = new Database();
             var entries = await db.GetLotteryEntriesAsync();
 
-            // Check if there are any entries
             if (entries.Count >= 1)
             {
-                // Draw the lottery automatically
-                Console.WriteLine("Drawing lottery automatically...");
                 await DrawLotteryAutomatically(db, entries);
-                Console.WriteLine("Automatic lottery draw completed.");
             }
             else
             {
-                Console.WriteLine("Not enough participants to draw a lottery.");
+                Console.WriteLine("Not enough participants.");
             }
         }
 
@@ -49,10 +43,11 @@ namespace BetBuddy
                 return;
             }
 
-            // Randomly select a winner
             var random = new Random();
             var randomValue = random.NextDouble() * totalAmount;
-            double cumulativeAmount = 0;
+            long cumulativeAmount = 0;
+
+            
 
             foreach (var entry in entries)
             {
@@ -60,19 +55,19 @@ namespace BetBuddy
 
                 if (cumulativeAmount >= randomValue)
                 {
+                    // aktualni balance vyherce
+                    long balance = await db.GetBalanceAsync(entry.UserId);
+
                     Console.WriteLine($"The winner is {entry.Username} with {entry.Amount} coins!");
+                    await db.UpdateBalanceAsync(entry.UserId, balance + totalAmount);
 
-                    // Update the winner's balance
-                    await db.UpdateBalanceAsync(entry.UserId, entry.Amount + totalAmount);
-
-                    // Retrieve the guild and channel for the winner
-                    var guild = await _discord.GetGuildAsync(entry.GuildId); // Get the guild where the lottery took place
-                    var channel = guild?.GetChannel(entry.ChannelId); // Get the specific channel
+                    var guild = await _discord.GetGuildAsync(entry.GuildId);
+                    var channel = guild?.GetChannel(entry.ChannelId);
 
                     if (channel != null)
                     {
-                        // Send a message to the channel of the winning server
-                        await channel.SendMessageAsync($"🎉 Congratulations, {entry.Username}! You have won the lottery and received {totalAmount} coins!");
+                        await channel.SendMessageAsync($"🎉 Congratulations, <@{entry.UserId}>! You have won the lottery and received **{totalAmount}** coins!");
+
                         Console.WriteLine($"Sent message to channel {channel.Name} on guild {guild.Name}");
                     }
                     else
@@ -80,7 +75,6 @@ namespace BetBuddy
                         Console.WriteLine("Couldn't find the specified channel.");
                     }
 
-                    // Clear the lottery entries
                     await db.ClearLotteryAsync();
                     return;
                 }
@@ -88,8 +82,5 @@ namespace BetBuddy
 
             Console.WriteLine("No winner selected (unexpected behavior).");
         }
-
-
-
     }
 }
