@@ -117,7 +117,7 @@ namespace ForexCastBot
                 }
 
                 int serverCount = discord.Guilds.Count;
-                
+
                 activities[1] = new DiscordActivity($"on {serverCount} servers! 🌍", ActivityType.Playing);
 
 
@@ -126,12 +126,11 @@ namespace ForexCastBot
             }
         }
     }
-        public class BotCommands : BaseCommandModule
+    public class BotCommands : BaseCommandModule
     {
         private static readonly HttpClient client = new HttpClient();
 
         ulong adminId = 409818422344417293;  // Admin ID
-
 
         [Command("help")]
         public async Task Help(CommandContext ctx)
@@ -144,24 +143,21 @@ namespace ForexCastBot
             .AddField("💰 Economy", "`bb money` - Check your balance\n`bb daily` - Claim your daily reward\n`bb work` - Claim your work reward\n`bb leaderboard` - Check top 10 richest players")
             .AddField("🎮 Games", "`bb rps <choice> <bet>` - Rock Paper Scissors\n`bb cf <bet>` - Coin Flip\n`bb roulette <choice> <bet>` - Roulette")
             .AddField("🎟 Lottery", "`bb lottery <amount>` - Join the lottery");
-            
 
             await ctx.RespondAsync(embed);
         }
 
-        // Command to view the player's balance
         [Command("money")]
         public async Task Money(CommandContext ctx)
         {
-            string username = ctx.User.Username;
+            ulong userId = ctx.User.Id;
             Database db = new Database();
-            long balance = await db.GetBalanceAsync(username);
-            await ctx.RespondAsync($"💰 {username}, your current balance is: **{balance}** coins.");
+            long balance = await db.GetBalanceAsync(userId);
+            await ctx.RespondAsync($"💰 <@{userId}>, your current balance is: **{balance}** coins.");
         }
 
-        // Command to add money to a player's balance (admin only)
         [Command("addmoney")]
-        public async Task AddMoney(CommandContext ctx, string playerUsername, long amount)
+        public async Task AddMoney(CommandContext ctx, string playerMention, long amount)
         {
             if (amount <= 0)
             {
@@ -169,88 +165,56 @@ namespace ForexCastBot
                 return;
             }
 
-            Database db = new Database();
-            bool playerExists = await db.PlayerExistsAsync(playerUsername);
-            if (!playerExists)
+            // extract player ID from mention
+            ulong playerId;
+            if (!ulong.TryParse(playerMention.Trim('<', '@', '>'), out playerId))
             {
-                await db.AddPlayerAsync(playerUsername);
+                await ctx.RespondAsync("⚠️ Invalid mention format.");
+                return;
             }
 
-            long currentBalance = await db.GetBalanceAsync(playerUsername);
+            Database db = new Database();
+
+            // check if player exists
+            bool playerExists = await db.PlayerExistsAsync(playerId);
+            if (!playerExists)
+            {
+                await ctx.RespondAsync("⚠️ This player doesn't exist in our database.");
+                return;
+            }
+
+            // get current balance
+            long currentBalance = await db.GetBalanceAsync(playerId);
             long newBalance = currentBalance + amount;
-            await db.UpdateBalanceAsync(playerUsername, newBalance);
 
-            await ctx.RespondAsync($"✅ **{amount}** coins have been added to {playerUsername}'s balance.\nNew balance: **{newBalance}** coins.");
-        }
+            // update balance
+            await db.UpdateBalanceAsync(playerId, newBalance);
 
-        // Command for the coin flip game
-        [Command("cf")]
-        public async Task CoinFlip(CommandContext ctx, string betString)
-        {
-            string username = ctx.User.Username;
-            Database db = new Database();
-            long playerBalance = await db.GetBalanceAsync(username);
-            long bet;
+            // mention the player
+            var mention = $"<@{playerId}>";
 
-            bool playerExists = await db.PlayerExistsAsync(username);
-            if (!playerExists)
-            {
-                await db.AddPlayerAsync(username);
-            }
-
-            if (betString == "all")
-            {
-                bet = playerBalance;
-            }
-            else if (!long.TryParse(betString, out bet) || bet <= 0)
-            {
-                await ctx.RespondAsync("⚠️ Please enter a valid bet amount greater than zero.");
-                return;
-            }
-
-            if (playerBalance < bet|| playerBalance == 0)
-            {
-                await ctx.RespondAsync($"⚠️ {username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
-                return;
-            }
-
-            Random random = new Random();
-            bool isWin = random.Next(0, 2) == 0;
-
-            if (isWin)
-            {
-                playerBalance += bet;
-                await ctx.RespondAsync($"🎉 HEADS! You win **{bet}** coins! New balance: **{playerBalance}** coins.");
-            }
-            else
-            {
-                playerBalance -= bet;
-                await ctx.RespondAsync($"😢 TAILS! You lose **{bet}** coins. New balance: **{playerBalance}** coins.");
-            }
-
-            await db.UpdateBalanceAsync(username, playerBalance);
+            // send response
+            await ctx.RespondAsync($"✅ **{amount}** coins have been added to {mention}'s balance.\nNew balance: **{newBalance}** coins.");
         }
 
 
-        // Command to show current lottery participants and total amount
-        // Command to enter the lottery and show the current participants
+
         [Command("lottery")]
         public async Task Lottery(CommandContext ctx, string? amount = null)
         {
+            ulong userId = ctx.User.Id;
             string username = ctx.User.Username;
             Database db = new Database();
 
-            string participantsMessage = "";
-            long playerBalance = await db.GetBalanceAsync(username);
-            long bet=0;
+            long playerBalance = await db.GetBalanceAsync(userId);
+            long bet = 0;
 
-            bool playerExists = await db.PlayerExistsAsync(username);
+            bool playerExists = await db.PlayerExistsAsync(userId);
             if (!playerExists)
             {
-                await db.AddPlayerAsync(username);
+                await db.AddPlayerAsync(userId, username);
             }
 
-            // if there is a bet amount, add the user to the lottery
             if (amount != null)
             {
                 if (amount == "all")
@@ -261,77 +225,75 @@ namespace ForexCastBot
                 {
                     await ctx.RespondAsync("⚠️ Please enter a valid amount greater than zero.");
                     return;
-                }else
+                }
+                else
                 {
                     bet = betAmount;
                 }
 
-
                 if (playerBalance < bet)
                 {
-                    await ctx.RespondAsync($"⚠️ {username}, you don't have enough coins to bet that amount. Your current balance is **{playerBalance}** coins.");
+                    await ctx.RespondAsync($"⚠️ <@{userId}>, you don't have enough coins to bet that amount. Your current balance is **{playerBalance}** coins.");
                     return;
                 }
 
-                // Add the user to the lottery
-                await db.AddLotteryEntryAsync(username, bet);
+                // add user to lottery
+                await db.AddToLotteryAsync(userId, bet);
+                Console.WriteLine($"User {userId} entered the lottery with {bet} coins.");
 
-                // Update the user's balance
-                await db.UpdateBalanceAsync(username, playerBalance - bet);
+                
 
-                participantsMessage += ($"✅ {username}, you have successfully entered the lottery with **{bet}** coins.\n");
+                await db.UpdateBalanceAsync(userId, playerBalance - bet);
+                Console.WriteLine("Balance updated.");
             }
 
-            // Get all lottery entries
+            // get total amount in lottery
             var entries = await db.GetLotteryEntriesAsync();
+            Console.WriteLine($"Entries Count: {entries.Count}");
             var totalAmount = await db.GetTotalLotteryAmountAsync();
-
+            Console.WriteLine($"Total Amount in Lottery: {totalAmount}");
+            // prepare message
             if (entries.Count == 0)
             {
                 await ctx.RespondAsync("⚠️ There are no participants in the lottery yet.");
                 return;
             }
+            else
+            {
+                Console.WriteLine($"Entries Count: {entries.Count}");
+            }
 
-            // Create a message with all participants and their chances
-            participantsMessage += $"🎉 Current Lottery Participants **({entries.Count}/5)**:\n";
+            // message to show participants
+            string participantsMessage = $"🎉 Current Lottery Participants **({entries.Count}/5)**:\n";
+            Console.WriteLine($"Total Amount in Lottery: {totalAmount}");
             foreach (var entry in entries)
             {
+                Console.WriteLine($"UserId: {entry.UserId}, Username: {entry.Username}, Amount: {entry.Amount}");
+
                 double chance = (double)entry.Amount / totalAmount * 100;
+                Console.WriteLine($"Chance for {entry.Username}: {chance:F2}%");
+
                 participantsMessage += $"- **{entry.Username}**: {entry.Amount} coins | **{chance:F2}%** chance\n";
+
             }
 
             participantsMessage += $"Total Lottery Pool: **{totalAmount}** coins.";
-            await ctx.RespondAsync(participantsMessage);
 
-            // Check if there are 5 participants, if so, automatically trigger the draw
+            // send message
+            await ctx.RespondAsync(participantsMessage);
+            Console.WriteLine("Participants message sent.");
+            // draw lottery automatically if there are 5 participants
             if (entries.Count >= 5)
             {
                 await DrawLotteryAutomatically(ctx);
             }
         }
 
-        // Command to manually draw the lottery (admin only)
-        [Command("drawlottery")]
-        public async Task DrawLottery(CommandContext ctx)
-        {
-            // Zkontroluj, zda má uživatel správné ID (admin ID)
-            if (ctx.User.Id != adminId)
-            {
-                await ctx.RespondAsync("⚠️ You do not have permission to perform this action.");
-                return;
-            }
 
-            // Zavolání metody pro losování, pokud je admin
-            await DrawLotteryAutomatically(ctx);
-        }
 
-        // Automatically draw the lottery when there are enough participants or triggered manually
         public async Task DrawLotteryAutomatically(CommandContext ctx)
         {
-            string username = ctx.User.Username;
             Database db = new Database();
-
-            // Get all lottery entries
             var entries = await db.GetLotteryEntriesAsync();
             if (entries.Count == 0)
             {
@@ -339,92 +301,79 @@ namespace ForexCastBot
                 return;
             }
 
-            // Calculate the total amount of coins in the lottery
-            long totalAmount = 0;
-            foreach (var entry in entries)
-            {
-                totalAmount += entry.Amount;
-            }
-
-            // Choose a random winner based on a random number
+            long totalAmount = entries.Sum(e => e.Amount);
             Random random = new Random();
             long randomNumber = random.Next(0, (int)totalAmount);
 
-            // Find the winner based on the random number
             long accumulatedAmount = 0;
-            string winner = "";
-            long winnerAmount = 0; // Store the winner's amount here for later calculation
+            ulong winnerId = 0;
+            long winnerAmount = 0;
+
             foreach (var entry in entries)
             {
                 accumulatedAmount += entry.Amount;
                 if (accumulatedAmount >= randomNumber)
                 {
-                    winner = entry.Username;
-                    winnerAmount = entry.Amount; // Store the winner's amount
+                    winnerId = entry.UserId;
+                    winnerAmount = entry.Amount;
                     break;
                 }
             }
 
-            // Calculate the winner's percentage chance
             double winnerChance = (double)winnerAmount / totalAmount * 100;
+            await ctx.RespondAsync($"🎉 The winner of the **{totalAmount}** coin lottery is <@{winnerId}>! Congratulations!\n📊 Winner had **{winnerChance:F2}%** chance of winning.");
 
-            // Announce the winner
-            await ctx.RespondAsync($"🎉 The winner of the **{totalAmount}** coin lottery is **{winner}**! Congratulations!\n📊 Winner had **{winnerChance:F2}%** chance of winning");
-
-            // Add the total amount to the winner's balance
-            long currentBalance = await db.GetBalanceAsync(winner);
-            await db.UpdateBalanceAsync(winner, currentBalance + totalAmount);
-
-            // Clear the lottery entries after the draw
+            long currentBalance = await db.GetBalanceAsync(winnerId);
+            await db.UpdateBalanceAsync(winnerId, currentBalance + totalAmount);
             await db.DeleteOldLotteryEntriesAsync(DateTime.UtcNow);
         }
+
 
         [Command("daily")]
         public async Task Daily(CommandContext ctx)
         {
-            string username = ctx.User.Username;
+            ulong userId = ctx.User.Id;  // Get Discord User ID
+            string username = ctx.User.Username;  // Get Discord Username
             Database db = new Database();
-            
-            if(!await db.PlayerExistsAsync(username))
+
+            if (!await db.PlayerExistsAsync(userId))
             {
-                await db.AddPlayerAsync(username);
+                await db.AddPlayerAsync(userId, username); // Use userId instead of username
             }
 
+            DateTime? lastClaimed = await db.GetLastClaimedAsync(userId);
+            DateTime today = DateTime.UtcNow.Date;
 
-            DateTime? lastClaimed = await db.GetLastClaimedAsync(username);
-            DateTime today = DateTime.UtcNow.Date; // Today's date
-
-            // If the user hasn't claimed their daily reward yet today
             if (!lastClaimed.HasValue || lastClaimed.Value.Date < today)
             {
                 Random random = new Random();
                 long reward = random.Next(500, 1501); // Reward between 500 and 1500
-                long currentBalance = await db.GetBalanceAsync(username);
+                long currentBalance = await db.GetBalanceAsync(userId);
                 long newBalance = currentBalance + reward;
 
-                await db.UpdateBalanceAsync(username, newBalance);
-                await db.UpdateLastClaimedAsync(username); // Update the last claimed time
+                await db.UpdateBalanceAsync(userId, newBalance);
+                await db.UpdateLastClaimedAsync(userId);
 
-                await ctx.RespondAsync($"🎉 {username}, you claimed your daily reward of **{reward}** coins! New balance: **{newBalance}** coins.");
+                await ctx.RespondAsync($"🎉 {ctx.User.Username}, you claimed your daily reward of **{reward}** coins! New balance: **{newBalance}** coins.");
             }
             else
             {
-                // Calculate the remaining time until midnight
-                var remainingTime = today.AddDays(1) - DateTime.UtcNow; // Time until midnight
-                await ctx.RespondAsync($"⚠️ {username}, you can claim your daily reward again tomorrow at midnight! Remaining time: **{remainingTime:hh\\:mm\\:ss}**.");
+                var remainingTime = today.AddDays(1) - DateTime.UtcNow;
+                await ctx.RespondAsync($"⚠️ {ctx.User.Username}, you can claim your daily reward again tomorrow at midnight! Remaining time: **{remainingTime:hh\\:mm\\:ss}**.");
             }
         }
 
         [Command("work")]
         public async Task Work(CommandContext ctx)
         {
+            ulong userId = ctx.User.Id;
             string username = ctx.User.Username;
             Database db = new Database();
-            long currentBalance = await db.GetBalanceAsync(username);
+            long currentBalance = await db.GetBalanceAsync(userId);
 
-            if (!await db.PlayerExistsAsync(username))
+            if (!await db.PlayerExistsAsync(userId))
             {
-                await db.AddPlayerAsync(username);
+                await db.AddPlayerAsync(userId, username);
             }
 
             if (currentBalance == 0)
@@ -433,204 +382,33 @@ namespace ForexCastBot
                 long reward = random.Next(20, 101); // Reward between 20 and 100
 
                 long newBalance = currentBalance + reward;
+                await db.UpdateBalanceAsync(userId, newBalance);
 
-                await db.UpdateBalanceAsync(username, newBalance);
-
-                await ctx.RespondAsync($"💼 **{username}**, you worked hard and earned **{reward}** coins! ✨ Your new balance is: **{newBalance}** coins. 🏅");
-                return;
+                await ctx.RespondAsync($"💼 **{ctx.User.Username}**, you worked hard and earned **{reward}** coins! ✨ Your new balance is: **{newBalance}** coins. 🏅");
             }
             else
             {
-                await ctx.RespondAsync($"⚠️ **{username}**, you can't work if you already have money. 💰 But don't worry, you can still try your luck in the casino! 🎰");
-                return;
+                await ctx.RespondAsync($"⚠️ **{ctx.User.Username}**, you can't work if you already have money. 💰 But don't worry, you can still try your luck in the casino! 🎰");
             }
         }
 
-
-        [Command("rps")]
-        public async Task RPS(CommandContext ctx, string playerChoice, string betString)
+        [Command("cf")]
+        public async Task Coinflip(CommandContext ctx, string betAmountString)
         {
-            // get username
+            ulong userId = ctx.User.Id;
             string username = ctx.User.Username;
             Database db = new Database();
-
-            long bet;  // Change bet to long
-
-            // get player balance
-            long playerBalance = await db.GetBalanceAsync(username);
-
-            if (!await db.PlayerExistsAsync(username))
-            {
-                await db.AddPlayerAsync(username);
-            }
-
-            if (betString == "all")
-            {
-                bet = playerBalance;
-            }
-            else if (!long.TryParse(betString, out long bett) || bett <= 0)  // Check if bet is a valid long
-            {
-                await ctx.RespondAsync("⚠️ Please enter a valid bet amount greater than zero.");
-                return;
-            }
-            else
-            {
-
-                bet = bett;
-            }
-
-            Console.WriteLine(ctx.User.Username + " RPS");
-
-            // check if player has enough balance
-            if (playerBalance < bet)
-            {
-                await ctx.RespondAsync($"⚠️ {username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
-                return;
-            }
-
-            // valid choices
-            string[] validChoices = { "rock", "paper", "scissors" };
-
-            // check if player choice is valid
-            if (!Array.Exists(validChoices, choice => choice == playerChoice.ToLower()))
-            {
-                await ctx.RespondAsync("⚠️ Please enter a valid choice: rock, paper, or scissors.");
-                return;
-            }
-
-            // computer choice
-            Random random = new Random();
-            int computerChoiceIndex = random.Next(0, 3);
-            string computerChoice = computerChoiceIndex switch
-            {
-                0 => "rock",
-                1 => "paper",
-                2 => "scissors",
-                _ => throw new InvalidOperationException()
-            };
-
-            // game logic
-            string result = "";
-            if (playerChoice.ToLower() == computerChoice)
-            {
-                result = "**It's a tie!**";
-            }
-            else if ((playerChoice.ToLower() == "rock" && computerChoice == "scissors") ||
-                     (playerChoice.ToLower() == "scissors" && computerChoice == "paper") ||
-                     (playerChoice.ToLower() == "paper" && computerChoice == "rock"))
-            {
-                result = "**You win!**";
-                playerBalance += bet;  // Player wins, add bet to balance
-            }
-            else
-            {
-                result = "**Computer wins!**";
-                playerBalance -= bet;  // Computer wins, subtract bet from balance
-            }
-
-            // update player balance
-            await db.UpdateBalanceAsync(username, playerBalance);
-
-            // send result message
-            string message = $"You chose: **{playerChoice.ToLower()}** with **{bet}** coins bet\n" +
-                             $"Computer chose: **{computerChoice}**\n" +
-                             $"{result}\n" +
-                             $"Your new balance is: **{playerBalance}** coins.";
-            await ctx.RespondAsync(message);
-        }
-
-        [Command("leaderboard")]
-        public async Task Leaderboard(CommandContext ctx)
-        {
-            Database db = new Database();
-            string username = ctx.User.Username;
-            // Získání všech top hráčů
-            var topPlayers = await db.GetTopPlayersAsync();
-
-            if (!await db.PlayerExistsAsync(username))
-            {
-                await db.AddPlayerAsync(username);
-            }
-
-            if (topPlayers.Count == 0)
-            {
-                await ctx.RespondAsync("⚠️ There are no players with a balance yet.");
-                return;
-            }
-
-            // Vytvoření zprávy pro leaderboard
-            string leaderboardMessage = "🏆 **Leaderboard - Top 10 Richest Players** 🏆\n";
-            int rank = 1;
-            foreach (var player in topPlayers)
-            {
-                leaderboardMessage += $"{rank}. **{player.Username}**: {player.Balance} coins\n";
-                rank++;
-                if (rank > 10) break; // Zobrazíme pouze top 10 hráčů
-            }
-
-            await ctx.RespondAsync(leaderboardMessage);
-        }
-
-        [Command("removeplayer")]
-        public async Task RemovePlayer(CommandContext ctx, string playerUsername)
-        {
-
-
-
-            // check if user has admin permissions
-            if (ctx.User.Id != adminId)
-            {
-                await ctx.RespondAsync("⚠️ You do not have permission to perform this action.");
-                return;
-            }
-
-            Database db = new Database();
-
-            // check if player exists
-            bool playerExists = await db.PlayerExistsAsync(playerUsername);
-            if (!playerExists)
-            {
-                await ctx.RespondAsync($"⚠️ Player **{playerUsername}** does not exist in the database.");
-                return;
-            }
-
-            // remove player
-            await db.RemovePlayerAsync(playerUsername);
-
-            await ctx.RespondAsync($"✅ Player **{playerUsername}** has been successfully removed from the database.");
-        }
-
-
-        [Command("printplayers")]
-        public async Task printPlayers(CommandContext ctx)
-        {
-            // check if user has admin permissions
-            if (ctx.User.Id != adminId)
-            {
-                await ctx.RespondAsync("⚠️ You do not have permission to perform this action.");
-                return;
-            }
-
-            Database db = new Database();
-            await db.PrintPlayersAsync();
-        }
-
-        [Command("roulette")]
-        public async Task Roulette(CommandContext ctx, string betType, string betAmountString)
-        {
-            string username = ctx.User.Username;
-            Database db = new Database();
-            long playerBalance = await db.GetBalanceAsync(username);
+            long playerBalance = await db.GetBalanceAsync(userId);
             long betAmount;
 
-            // Pokud hráč neexistuje v databázi, přidáme ho
-            bool playerExists = await db.PlayerExistsAsync(username);
+            // check if player exists
+            bool playerExists = await db.PlayerExistsAsync(userId);
             if (!playerExists)
             {
-                await db.AddPlayerAsync(username);
+                await db.AddPlayerAsync(userId, username);
             }
 
-            // Pokud hráč zadá "all", vsadí celý svůj balance
+            // check if bet amount is valid
             if (betAmountString == "all")
             {
                 betAmount = playerBalance;
@@ -641,23 +419,225 @@ namespace ForexCastBot
                 return;
             }
 
-            // Kontrola, jestli hráč má dost peněz na sázku
+            // check if player has enough balance
             if (playerBalance < betAmount || playerBalance == 0)
             {
                 await ctx.RespondAsync($"⚠️ {username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
                 return;
             }
 
-            // Vytvoření číselníku pro barvy rulety
+            // choose heads or tails
+            string betChoice = "heads";
+            if (betChoice != "heads" && betChoice != "tails")
+            {
+                await ctx.RespondAsync("⚠️ Please choose between **heads** or **tails**.");
+                return;
+            }
+
+            // flip the coin
+            Random rand = new Random();
+            string coinResult = rand.Next(0, 2) == 0 ? "heads" : "tails";
+
+            // prepare result message
+            string resultMessage = $"🪙 You bet on **{betChoice}**. The coin landed on **{coinResult}**! ";
+
+            if (betChoice == coinResult)
+            {
+                //  player wins
+                long winnings = betAmount * 2; // double the bet amount
+                playerBalance += winnings;
+                resultMessage += $"🎉 You win! You received **{winnings}** coins.";
+            }
+            else
+            {
+                // player loses
+                playerBalance -= betAmount;
+                resultMessage += $"❌ You lose! You lost **{betAmount}** coins.";
+            }
+
+            // update player balance
+            await db.UpdateBalanceAsync(userId, playerBalance);
+            resultMessage += $" Your new balance is: **{playerBalance}** coins.";
+
+            // send result message
+            await ctx.RespondAsync(resultMessage);
+        }
+
+
+        [Command("rps")]
+        public async Task RPS(CommandContext ctx, string playerChoice, string betString)
+        {
+            ulong userId = ctx.User.Id;
+            string username = ctx.User.Username;
+            Database db = new Database();
+            long bet;
+            long playerBalance = await db.GetBalanceAsync(userId);
+
+            if (!await db.PlayerExistsAsync(userId))
+            {
+                await db.AddPlayerAsync(userId, username);
+            }
+
+            if (betString == "all")
+            {
+                bet = playerBalance;
+            }
+            else if (!long.TryParse(betString, out long bett) || bett <= 0)
+            {
+                await ctx.RespondAsync("⚠️ Please enter a valid bet amount greater than zero.");
+                return;
+            }
+            else
+            {
+                bet = bett;
+            }
+
+            if (playerBalance < bet)
+            {
+                await ctx.RespondAsync($"⚠️ {ctx.User.Username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
+                return;
+            }
+
+            string[] validChoices = { "rock", "paper", "scissors" };
+
+            if (!Array.Exists(validChoices, choice => choice == playerChoice.ToLower()))
+            {
+                await ctx.RespondAsync("⚠️ Please enter a valid choice: rock, paper, or scissors.");
+                return;
+            }
+
+            Random random = new Random();
+            int computerChoiceIndex = random.Next(0, 3);
+            string computerChoice = computerChoiceIndex switch
+            {
+                0 => "rock",
+                1 => "paper",
+                2 => "scissors",
+                _ => throw new InvalidOperationException()
+            };
+
+            string result = "";
+            if (playerChoice.ToLower() == computerChoice)
+            {
+                result = "**It's a tie!**";
+            }
+            else if ((playerChoice.ToLower() == "rock" && computerChoice == "scissors") ||
+                     (playerChoice.ToLower() == "scissors" && computerChoice == "paper") ||
+                     (playerChoice.ToLower() == "paper" && computerChoice == "rock"))
+            {
+                result = "**You win!**";
+                playerBalance += bet;
+            }
+            else
+            {
+                result = "**Computer wins!**";
+                playerBalance -= bet;
+            }
+
+            await db.UpdateBalanceAsync(userId, playerBalance);
+
+            string message = $"You chose: **{playerChoice.ToLower()}** with **{bet}** coins bet\n" +
+                             $"Computer chose: **{computerChoice}**\n" +
+                             $"{result}\n" +
+                             $"Your new balance is: **{playerBalance}** coins.";
+            await ctx.RespondAsync(message);
+        }
+
+        [Command("leaderboard")]
+        public async Task Leaderboard(CommandContext ctx)
+        {
+            ulong userId = ctx.User.Id;
+            string username = ctx.User.Username;
+            Database db = new Database();
+            var topPlayers = await db.GetTopPlayersAsync();
+
+            if (!await db.PlayerExistsAsync(userId))
+            {
+                await db.AddPlayerAsync(userId, username);
+            }
+
+            if (topPlayers.Count == 0)
+            {
+                await ctx.RespondAsync("⚠️ There are no players with a balance yet.");
+                return;
+            }
+
+            string leaderboardMessage = "🏆 **Leaderboard - Top 10 Richest Players** 🏆\n";
+            int rank = 1;
+            foreach (var player in topPlayers)
+            {
+                leaderboardMessage += $"{rank}. **{player.Username}**: {player.Balance} coins\n";
+                rank++;
+                if (rank > 10) break;
+            }
+
+            await ctx.RespondAsync(leaderboardMessage);
+        }
+
+        [Command("removeplayer")]
+        public async Task RemovePlayer(CommandContext ctx, ulong playerId)
+        {
+            if (ctx.User.Id != adminId)
+            {
+                await ctx.RespondAsync("⚠️ You do not have permission to perform this action.");
+                return;
+            }
+
+            Database db = new Database();
+
+            bool playerExists = await db.PlayerExistsAsync(playerId);
+            if (!playerExists)
+            {
+                await ctx.RespondAsync($"⚠️ Player with ID **{playerId}** does not exist in the database.");
+                return;
+            }
+
+            await db.RemovePlayerAsync(playerId);
+
+            await ctx.RespondAsync($"✅ Player with ID **{playerId}** has been successfully removed from the database.");
+        }
+
+        [Command("roulette")]
+        public async Task Roulette(CommandContext ctx, string betType, string betAmountString)
+        {
+            ulong userId = ctx.User.Id;
+            string username = ctx.User.Username;
+            Database db = new Database();
+            long playerBalance = await db.GetBalanceAsync(userId);
+            long betAmount;
+
+            bool playerExists = await db.PlayerExistsAsync(userId);
+            if (!playerExists)
+            {
+                await db.AddPlayerAsync(userId, username);
+            }
+
+            if (betAmountString == "all")
+            {
+                betAmount = playerBalance;
+            }
+            else if (!long.TryParse(betAmountString, out betAmount) || betAmount <= 0)
+            {
+                await ctx.RespondAsync("⚠️ Please enter a valid bet amount greater than zero.");
+                return;
+            }
+
+            if (playerBalance < betAmount || playerBalance == 0)
+            {
+                await ctx.RespondAsync($"⚠️ {ctx.User.Username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
+                return;
+            }
+
             var colors = new Dictionary<int, string>()
-    {
-        {0, "green"}, {1, "red"}, {2, "black"}, {3, "red"}, {4, "black"}, {5, "red"}, {6, "black"},
-        {7, "red"}, {8, "black"}, {9, "red"}, {10, "black"}, {11, "black"}, {12, "red"}, {13, "black"},
-        {14, "red"}, {15, "black"}, {16, "red"}, {17, "black"}, {18, "red"}, {19, "red"}, {20, "black"},
-        {21, "red"}, {22, "black"}, {23, "red"}, {24, "black"}, {25, "red"}, {26, "black"}, {27, "red"},
-        {28, "black"}, {29, "black"}, {30, "red"}, {31, "black"}, {32, "red"}, {33, "black"}, {34, "red"},
-        {35, "black"}, {36, "red"}
-    };
+            {
+                {0, "green"}, {1, "red"}, {2, "black"}, {3, "red"}, {4, "black"}, {5, "red"},
+                {6, "black"}, {7, "red"}, {8, "black"}, {9, "red"}, {10, "black"}, {11, "black"},
+                {12, "red"}, {13, "black"}, {14, "red"}, {15, "black"}, {16, "red"}, {17, "black"},
+                {18, "red"}, {19, "red"}, {20, "black"}, {21, "red"}, {22, "black"}, {23, "red"},
+                {24, "black"}, {25, "red"}, {26, "black"}, {27, "red"}, {28, "black"}, {29, "black"},
+                {30, "red"}, {31, "black"}, {32, "red"}, {33, "black"}, {34, "red"}, {35, "black"},
+                {36, "red"}
+            };
 
             betType = betType.ToLower();
             bool isNumberBet = int.TryParse(betType, out int betNumber);
@@ -668,7 +648,6 @@ namespace ForexCastBot
                 return;
             }
 
-            // Ruleta - generování náhodného čísla
             Random rand = new Random();
             int rolledNumber = rand.Next(37);
             string rolledColor = colors[rolledNumber];
@@ -693,11 +672,12 @@ namespace ForexCastBot
                 resultMessage += "❌ You lose!";
             }
 
-            await db.UpdateBalanceAsync(username, playerBalance);
+            await db.UpdateBalanceAsync(userId, playerBalance);
             resultMessage += $" Your new balance: **{playerBalance}💰**.";
 
             await ctx.RespondAsync(resultMessage);
         }
 
     }
+
 }
