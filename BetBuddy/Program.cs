@@ -11,6 +11,8 @@ using System.IO;
 using dotenv.net;
 using System.Numerics;
 using DSharpPlus.Entities;
+using Quartz.Impl;
+using Quartz;
 
 
 /*
@@ -44,7 +46,7 @@ using DSharpPlus.Entities;
 
 
 
-namespace ForexCastBot
+namespace BetBuddy
 {
     internal class Program
     {
@@ -78,6 +80,24 @@ namespace ForexCastBot
 
             commands.RegisterCommands<BotCommands>();
 
+            //  Initialize the Quartz scheduler
+            var schedulerFactory = new StdSchedulerFactory();
+            var scheduler = await schedulerFactory.GetScheduler();
+            await scheduler.Start();
+
+            // Schedule the lottery job to run every day at 20:00
+            IJobDetail job = JobBuilder.Create<LotteryJob>()
+                .WithIdentity("LotteryJob", "group1")
+                .Build();
+
+            var trigger = TriggerBuilder.Create()
+                                  .WithIdentity("EverySecondTrigger", "Group1")
+                                  .WithCronSchedule("0 0 20 * * ?") // Every day at 20:00
+                                  .Build();
+
+            await scheduler.ScheduleJob(job, trigger);
+
+            Console.WriteLine("Lottery job scheduled to run every day at 20:00.");
 
             await discord.ConnectAsync();
             await Task.Delay(5000); // Wait for the bot to connect
@@ -86,13 +106,6 @@ namespace ForexCastBot
             {
                 new DiscordActivity("lottery status", ActivityType.Watching),
                 new DiscordActivity("Server status", ActivityType.Playing),
-                //new DiscordActivity("your losses 💸", ActivityType.Watching),
-                //new DiscordActivity("your debt 📻", ActivityType.ListeningTo),
-                
-                //new DiscordActivity("the odds 🤫", ActivityType.Playing),
-                //new DiscordActivity("bad bets 📉", ActivityType.Watching),
-                
-
             };
 
             int index = 0;
@@ -107,13 +120,18 @@ namespace ForexCastBot
                 var entries = await db.GetLotteryEntriesAsync();
                 var totalAmount = await db.GetTotalLotteryAmountAsync();
                 var entriesCount = entries.Count;
+
+                var timeRemaining = GetTimeRemainingUntilLottery();
+
+
                 if (entriesCount == 0)
                 {
                     activities[0] = new DiscordActivity($"there is not lottery in progress", ActivityType.Watching);
                 }
                 else
                 {
-                    activities[0] = new DiscordActivity($"the lottery 🎰 ({entries.Count}/5) - {totalAmount} coins", ActivityType.Watching);
+                    activities[0] = new DiscordActivity($"lottery in: {timeRemaining} with {totalAmount} coins.", ActivityType.Playing);
+
                 }
 
                 int serverCount = discord.Guilds.Count;
@@ -124,8 +142,26 @@ namespace ForexCastBot
                 index = (index + 1) % activities.Count; // Move to the next activity
                 await Task.Delay(90000); //  wait
             }
+
+
         }
+        public static string GetTimeRemainingUntilLottery()
+        {
+            var now = DateTime.Now;
+            var nextLotteryTime = DateTime.Today.AddHours(20); // 20:00 today
+            if (now > nextLotteryTime)
+            {
+                nextLotteryTime = nextLotteryTime.AddDays(1); // if it's already past 20:00, set the time to tomorrow's 20:00
+            }
+
+            var remainingTime = nextLotteryTime - now;
+            return remainingTime.ToString(@"h\h\ m\m");
+        }
+
     }
+
+
+
     public class BotCommands : BaseCommandModule
     {
         private static readonly HttpClient client = new HttpClient();
@@ -138,11 +174,11 @@ namespace ForexCastBot
             var embed = new DiscordEmbedBuilder
             {
                 Title = "📜 Available Commands",
-                Color = DiscordColor.Azure
+                Color = DiscordColor.Blue
             }
             .AddField("💰 Economy", "`bb money` - Check your balance\n`bb daily` - Claim your daily reward\n`bb work` - Claim your work reward\n`bb leaderboard` - Check top 10 richest players")
             .AddField("🎮 Games", "`bb rps <choice> <bet>` - Rock Paper Scissors\n`bb cf <bet>` - Coin Flip\n`bb roulette <choice> <bet>` - Roulette")
-            .AddField("🎟 Lottery", "`bb lottery <amount>` - Join the lottery");
+            .AddField("🎟 Lottery", "`bb lottery <amount>` - Join the lottery (drawn daily)");
 
             await ctx.RespondAsync(embed);
         }
@@ -197,7 +233,18 @@ namespace ForexCastBot
             await ctx.RespondAsync($"✅ **{amount}** coins have been added to {mention}'s balance.\nNew balance: **{newBalance}** coins.");
         }
 
+        private static string GetTimeRemainingUntilLottery()
+        {
+            var now = DateTime.Now;
+            var nextLotteryTime = DateTime.Today.AddHours(20); // 20:00 today
+            if (now > nextLotteryTime)
+            {
+                nextLotteryTime = nextLotteryTime.AddDays(1); // if it's already past 20:00, set the time to tomorrow's 20:00
+            }
 
+            var remainingTime = nextLotteryTime - now;
+            return remainingTime.ToString(@"h\h\ m\m");
+        }
 
         [Command("lottery")]
         public async Task Lottery(CommandContext ctx, string? amount = null)
@@ -237,96 +284,48 @@ namespace ForexCastBot
                     return;
                 }
 
-                // add user to lottery
-                await db.AddToLotteryAsync(userId, bet);
+                // Add user to lottery
+                ulong guildId = ctx.Guild.Id;
+                ulong channelId = ctx.Channel.Id;
+                await db.AddToLotteryAsync(userId, bet, guildId, channelId);
                 Console.WriteLine($"User {userId} entered the lottery with {bet} coins.");
 
-                
-
+                // Update balance
                 await db.UpdateBalanceAsync(userId, playerBalance - bet);
                 Console.WriteLine("Balance updated.");
             }
 
-            // get total amount in lottery
+            // Get total amount in lottery
             var entries = await db.GetLotteryEntriesAsync();
             Console.WriteLine($"Entries Count: {entries.Count}");
             var totalAmount = await db.GetTotalLotteryAmountAsync();
             Console.WriteLine($"Total Amount in Lottery: {totalAmount}");
-            // prepare message
+
+            // Prepare message
             if (entries.Count == 0)
             {
                 await ctx.RespondAsync("⚠️ There are no participants in the lottery yet.");
                 return;
             }
-            else
-            {
-                Console.WriteLine($"Entries Count: {entries.Count}");
-            }
 
-            // message to show participants
-            string participantsMessage = $"🎉 Current Lottery Participants **({entries.Count}/5)**:\n";
-            Console.WriteLine($"Total Amount in Lottery: {totalAmount}");
+            // Message to show participants
+            string participantsMessage = $"🎉 Current Lottery Participants **({entries.Count})**:\n";
             foreach (var entry in entries)
             {
                 Console.WriteLine($"UserId: {entry.UserId}, Username: {entry.Username}, Amount: {entry.Amount}");
-
                 double chance = (double)entry.Amount / totalAmount * 100;
-                Console.WriteLine($"Chance for {entry.Username}: {chance:F2}%");
-
                 participantsMessage += $"- **{entry.Username}**: {entry.Amount} coins | **{chance:F2}%** chance\n";
-
             }
 
-            participantsMessage += $"Total Lottery Pool: **{totalAmount}** coins.";
-
-            // send message
+            participantsMessage += $"Total Lottery Pool: **{totalAmount}** coins.\n";
+            var timeRemaining = GetTimeRemainingUntilLottery();
+            participantsMessage += $"Winner drawn automatically in {timeRemaining}";
+            // Send message
             await ctx.RespondAsync(participantsMessage);
             Console.WriteLine("Participants message sent.");
-            // draw lottery automatically if there are 5 participants
-            if (entries.Count >= 5)
-            {
-                await DrawLotteryAutomatically(ctx);
-            }
         }
 
 
-
-        public async Task DrawLotteryAutomatically(CommandContext ctx)
-        {
-            Database db = new Database();
-            var entries = await db.GetLotteryEntriesAsync();
-            if (entries.Count == 0)
-            {
-                await ctx.RespondAsync("⚠️ No one has entered the lottery.");
-                return;
-            }
-
-            long totalAmount = entries.Sum(e => e.Amount);
-            Random random = new Random();
-            long randomNumber = random.Next(0, (int)totalAmount);
-
-            long accumulatedAmount = 0;
-            ulong winnerId = 0;
-            long winnerAmount = 0;
-
-            foreach (var entry in entries)
-            {
-                accumulatedAmount += entry.Amount;
-                if (accumulatedAmount >= randomNumber)
-                {
-                    winnerId = entry.UserId;
-                    winnerAmount = entry.Amount;
-                    break;
-                }
-            }
-
-            double winnerChance = (double)winnerAmount / totalAmount * 100;
-            await ctx.RespondAsync($"🎉 The winner of the **{totalAmount}** coin lottery is <@{winnerId}>! Congratulations!\n📊 Winner had **{winnerChance:F2}%** chance of winning.");
-
-            long currentBalance = await db.GetBalanceAsync(winnerId);
-            await db.UpdateBalanceAsync(winnerId, currentBalance + totalAmount);
-            await db.DeleteOldLotteryEntriesAsync(DateTime.UtcNow);
-        }
 
 
         [Command("daily")]
@@ -677,6 +676,9 @@ namespace ForexCastBot
 
             await ctx.RespondAsync(resultMessage);
         }
+
+
+
 
     }
 

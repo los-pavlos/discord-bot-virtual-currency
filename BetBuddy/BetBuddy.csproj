@@ -13,6 +13,7 @@
     <PackageReference Include="DSharpPlus.CommandsNext" Version="4.5.0" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Quartz" Version="3.13.1" />
     <PackageReference Include="SQLite" Version="3.13.0" />
     <PackageReference Include="System.Data.SQLite" Version="1.0.119" />
   </ItemGroup>

@@ -34,8 +34,11 @@ public class Database
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     UserId INTEGER,
                     Amount BIGINT,
+                    GuildId BIGINT,   -- ID serveru (guild)
+                    ChannelId BIGINT, -- ID kanálu
                     EntryTime DATETIME,
-                    FOREIGN KEY (UserId) REFERENCES Players(UserId))",
+                    FOREIGN KEY (UserId) REFERENCES Players(UserId))
+                ",
                 connection);
             lotteryTableCommand.ExecuteNonQuery();
         }
@@ -184,62 +187,67 @@ public class Database
         }
     }
 
-    public async Task AddToLotteryAsync(ulong userId, long amount)
+    public async Task AddToLotteryAsync(ulong userId, long amount, ulong guildId, ulong channelId)
     {
         using (var connection = new SQLiteConnection(connectionString))
         {
             await connection.OpenAsync();
 
             // check if the user already has an entry in the lottery
-            var checkCommand = new SQLiteCommand("SELECT Amount FROM LotteryEntries WHERE UserId = @UserId", connection);
+            var checkCommand = new SQLiteCommand("SELECT Amount FROM LotteryEntries WHERE UserId = @UserId AND GuildId = @GuildId", connection);
             checkCommand.Parameters.AddWithValue("@UserId", userId);
+            checkCommand.Parameters.AddWithValue("@GuildId", guildId);
 
             var reader = await checkCommand.ExecuteReaderAsync();
 
-            if (await reader.ReadAsync()) // user already has an entry in the lottery
+            if (await reader.ReadAsync()) // user already has an entry in the lottery for the specific guild
             {
                 long currentAmount = reader.GetInt64(0);
                 long newAmount = currentAmount + amount;
 
                 // update the amount
-                var updateCommand = new SQLiteCommand("UPDATE LotteryEntries SET Amount = @Amount WHERE UserId = @UserId", connection);
+                var updateCommand = new SQLiteCommand("UPDATE LotteryEntries SET Amount = @Amount WHERE UserId = @UserId AND GuildId = @GuildId", connection);
                 updateCommand.Parameters.AddWithValue("@Amount", newAmount);
                 updateCommand.Parameters.AddWithValue("@UserId", userId);
+                updateCommand.Parameters.AddWithValue("@GuildId", guildId);
 
                 await updateCommand.ExecuteNonQueryAsync();
             }
             else // user doesn't have an entry in the lottery
             {
-                var insertCommand = new SQLiteCommand("INSERT INTO LotteryEntries (UserId, Amount) VALUES (@UserId, @Amount)", connection);
+                var insertCommand = new SQLiteCommand("INSERT INTO LotteryEntries (UserId, Amount, GuildId, ChannelId) VALUES (@UserId, @Amount, @GuildId, @ChannelId)", connection);
                 insertCommand.Parameters.AddWithValue("@UserId", userId);
                 insertCommand.Parameters.AddWithValue("@Amount", amount);
+                insertCommand.Parameters.AddWithValue("@GuildId", guildId);
+                insertCommand.Parameters.AddWithValue("@ChannelId", channelId);
 
                 await insertCommand.ExecuteNonQueryAsync();
             }
         }
     }
 
-    public async Task<List<(ulong UserId, string Username, long Amount)>> GetLotteryEntriesAsync()
+
+    public async Task<List<(ulong UserId, string Username, long Amount, ulong GuildId, ulong ChannelId)>> GetLotteryEntriesAsync()
     {
         using (var connection = new SQLiteConnection(connectionString))
         {
             await connection.OpenAsync();
 
-            
-            var command = new SQLiteCommand("SELECT LotteryEntries.UserId, Players.Username, LotteryEntries.Amount FROM LotteryEntries JOIN Players ON LotteryEntries.UserId = Players.UserId", connection);
+            var command = new SQLiteCommand("SELECT LotteryEntries.UserId, Players.Username, LotteryEntries.Amount, LotteryEntries.GuildId, LotteryEntries.ChannelId " +
+                                            "FROM LotteryEntries JOIN Players ON LotteryEntries.UserId = Players.UserId", connection);
 
             var reader = await command.ExecuteReaderAsync();
-            var entries = new List<(ulong UserId, string Username, long Amount)>();
+            var entries = new List<(ulong UserId, string Username, long Amount, ulong GuildId, ulong ChannelId)>();
 
             while (await reader.ReadAsync())
             {
-                // Get the UserId, Username, and Amount from the query result
                 ulong userId = (ulong)reader.GetInt64(0);
                 string username = reader.GetString(1);
                 long amount = reader.GetInt64(2);
+                ulong guildId = (ulong)reader.GetInt64(3);
+                ulong channelId = (ulong)reader.GetInt64(4);
 
-                // Add the tuple to the list
-                entries.Add((userId, username, amount));
+                entries.Add((userId, username, amount, guildId, channelId));
             }
 
             return entries;
@@ -279,6 +287,17 @@ public class Database
             await connection.OpenAsync();
             var command = new SQLiteCommand("DELETE FROM LotteryEntries WHERE EntryTime < @cutoffDate", connection);
             command.Parameters.AddWithValue("@cutoffDate", cutoffDate);
+            await command.ExecuteNonQueryAsync();
+        }
+    }
+
+    // method to clear all lottery entries
+    public async Task ClearLotteryAsync()
+    {
+        using (var connection = new SQLiteConnection(connectionString))
+        {
+            await connection.OpenAsync();
+            var command = new SQLiteCommand("DELETE FROM LotteryEntries", connection); // Vymazání všech účastníků
             await command.ExecuteNonQueryAsync();
         }
     }
