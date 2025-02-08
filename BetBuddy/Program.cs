@@ -27,6 +27,7 @@ using DSharpPlus.Entities;
  * - bb daily: Claim your daily reward
  * - bb work: Work to earn coins
  * - bb rps <choice> <bet>: Play rock-paper-scissors
+ * - bb rulette <choice> <bet>: Play roulette
  * 
  *  add package DSharpPlus
  *  add package DSharpPlus.CommandsNext
