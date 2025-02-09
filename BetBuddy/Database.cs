@@ -45,17 +45,7 @@ public class Database
         }
     }
 
-    public async Task<bool> PlayerExistsAsync(ulong userId)
-    {
-        using (var connection = new SQLiteConnection(connectionString))
-        {
-            await connection.OpenAsync();
-            var command = new SQLiteCommand("SELECT COUNT(1) FROM Players WHERE UserId = @userId", connection);
-            command.Parameters.AddWithValue("@userId", userId);
-            var result = await command.ExecuteScalarAsync();
-            return Convert.ToInt32(result) > 0;
-        }
-    }
+    //  Leaderboard / TOP 10
     public async Task<List<(string Username, long Balance)>> GetTopPlayersAsync()
     {
         var topPlayers = new List<(string Username, long Balance)>();
@@ -82,6 +72,21 @@ public class Database
         }
 
         return topPlayers;
+    }
+
+
+
+    //  Players and balance
+    public async Task<bool> PlayerExistsAsync(ulong userId)
+    {
+        using (var connection = new SQLiteConnection(connectionString))
+        {
+            await connection.OpenAsync();
+            var command = new SQLiteCommand("SELECT COUNT(1) FROM Players WHERE UserId = @userId", connection);
+            command.Parameters.AddWithValue("@userId", userId);
+            var result = await command.ExecuteScalarAsync();
+            return Convert.ToInt32(result) > 0;
+        }
     }
 
     public async Task AddPlayerAsync(ulong userId, string username)
@@ -165,6 +170,8 @@ public class Database
     }
 
 
+
+    //  DAILY REWARDS
     public async Task<DateTime?> GetLastClaimedAsync(ulong userId)
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -189,6 +196,9 @@ public class Database
         }
     }
 
+
+
+    // LOTTERY  
     public async Task AddToLotteryAsync(ulong userId, long amount, ulong guildId, ulong channelId)
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -231,9 +241,6 @@ public class Database
         }
     }
 
-
-
-
     public async Task<List<(ulong UserId, string Username, long Amount, ulong GuildId, ulong ChannelId)>> GetLotteryEntriesAsync()
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -258,18 +265,6 @@ public class Database
             }
 
             return entries;
-        }
-    }
-
-
-    public async Task RemovePlayerAsync(ulong userId)
-    {
-        using (var connection = new SQLiteConnection(connectionString))
-        {
-            await connection.OpenAsync();
-            var command = new SQLiteCommand("DELETE FROM Players WHERE UserId = @userId", connection);
-            command.Parameters.AddWithValue("@userId", userId);
-            await command.ExecuteNonQueryAsync();
         }
     }
 
@@ -304,6 +299,19 @@ public class Database
         {
             await connection.OpenAsync();
             var command = new SQLiteCommand("DELETE FROM LotteryEntries", connection); // Vymazání všech účastníků
+            await command.ExecuteNonQueryAsync();
+        }
+    }
+
+
+    //  Remove player
+    public async Task RemovePlayerAsync(ulong userId)
+    {
+        using (var connection = new SQLiteConnection(connectionString))
+        {
+            await connection.OpenAsync();
+            var command = new SQLiteCommand("DELETE FROM Players WHERE UserId = @userId", connection);
+            command.Parameters.AddWithValue("@userId", userId);
             await command.ExecuteNonQueryAsync();
         }
     }

@@ -15,12 +15,12 @@ namespace BetBuddy
 
         public IJob NewJob(TriggerFiredBundle bundle, IScheduler scheduler)
         {
-            return new LotteryJob(_discord);  // 🔹 Vytvoří novou instanci s existujícím DiscordClient
+            return new LotteryJob(_discord);  // create a new instance of LotteryJob
         }
 
         public void ReturnJob(IJob job)
         {
-            // Nepotřebujeme nic dělat, protože Quartz zvládá garbage collection
+            // nothing to do here
         }
     }
 }
