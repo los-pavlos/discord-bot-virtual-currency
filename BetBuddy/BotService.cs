@@ -113,40 +113,33 @@ namespace BetBuddy
         private async Task UpdateActivityLoop()
         {
             Database db = new Database();
-            //  lottery info
-            long lotteryPool = db.GetTotalLotteryAmountAsync().Result;
-            DateTime lotteryCloseTime = await GetNextLotteryCloseTimeAsync();
 
-            // Calculate time remaining
-            TimeSpan timeRemaining = lotteryCloseTime - DateTime.Now;
-            string timeRemainingFormatted = $"{timeRemaining.Hours}h {timeRemaining.Minutes}m";
-
-            // info about the bot
-            int serversCount = _discord.Guilds.Count;
-
-            var activities = new List<DiscordActivity>
-            {
-                // lottery status
-                new DiscordActivity($"lottery in {timeRemainingFormatted} with {lotteryPool} coins  ", ActivityType.Playing),
-
-                // Servers count status
-                new DiscordActivity($"on {serversCount} servers", ActivityType.Playing),
-            };
-             
-            //  loop through activities
-            int index = 0;
             while (true)
             {
-                lotteryPool = db.GetTotalLotteryAmountAsync().Result;
-                lotteryCloseTime = await GetNextLotteryCloseTimeAsync();
-                timeRemaining = lotteryCloseTime - DateTime.Now;
-                timeRemainingFormatted = $"{timeRemaining.Hours}h {timeRemaining.Minutes}m";
-                serversCount = _discord.Guilds.Count;
+                // Activity data
+                long lotteryPool = await db.GetTotalLotteryAmountAsync();
+                DateTime lotteryCloseTime = await GetNextLotteryCloseTimeAsync();
+                TimeSpan timeRemaining = lotteryCloseTime - DateTime.Now;
+                string timeRemainingFormatted = $"{timeRemaining.Hours}h {timeRemaining.Minutes}m";
 
-                await _discord.UpdateStatusAsync(activities[index], UserStatus.Online);
-                index = (index + 1) % activities.Count;
-                await Task.Delay(60000); // every 60 seconds switch activity
+                // Count servers
+                int serversCount = _discord.Guilds.Count;
+
+                // Create a list of activities
+                var activities = new List<DiscordActivity>
+                {
+                    new DiscordActivity($"lottery in {timeRemainingFormatted} with {lotteryPool} coins", ActivityType.Playing),
+                    new DiscordActivity($"on {serversCount} servers", ActivityType.Playing),
+                };
+
+                // Switch activities
+                for (int i = 0; i < activities.Count; i++)
+                {
+                    await _discord.UpdateStatusAsync(activities[i], UserStatus.Online);
+                    await Task.Delay(60000); // Wait 1 minute
+                }
             }
         }
+
     }
 }

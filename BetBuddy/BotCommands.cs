@@ -44,6 +44,55 @@ namespace BetBuddy
             Console.WriteLine($"User {userId} checked their balance.");
         }
 
+
+        [Command("give")]
+        public async Task Give(CommandContext ctx, string playerMention, long amount)
+        {
+            if (amount <= 0)
+            {
+                await ctx.RespondAsync("⚠️ Please enter a valid amount greater than zero.");
+                return;
+            }
+
+            // extract player ID from mention
+            ulong playerId;
+            if (!ulong.TryParse(playerMention.Trim('<', '@', '>'), out playerId))
+            {
+                await ctx.RespondAsync("⚠️ Invalid mention format.");
+                return;
+            }
+
+            Database db = new Database();
+            // check if player exists
+            bool playerExists = await db.PlayerExistsAsync(playerId);
+            if (!playerExists)
+            {
+                await ctx.RespondAsync("⚠️ This player doesn't exist in our database.");
+                return;
+            }
+            ulong userId = ctx.User.Id;
+            long balance = await db.GetBalanceAsync(userId);
+            if (balance < amount)
+            {
+                await ctx.RespondAsync($"⚠️ You don't have enough money. Your curent balance is {balance}");
+                return;
+            }
+            balance -= amount;
+            await db.UpdateBalanceAsync(userId, balance);
+
+
+            // get current balance
+            long currentBalance = await db.GetBalanceAsync(playerId);
+            long newBalance = currentBalance + amount;
+            // update balance
+            await db.UpdateBalanceAsync(playerId, newBalance);
+            // mention the player
+            var mention = $"<@{playerId}>";
+            // send response
+            await ctx.RespondAsync($"✅ **{amount}** coins have been sent to {mention}.\nNew balance: **{newBalance}** coins.");
+        }
+
+
         [Command("addmoney")]
         public async Task AddMoney(CommandContext ctx, string playerMention, long amount)
         {
