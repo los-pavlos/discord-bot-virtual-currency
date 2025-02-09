@@ -132,11 +132,17 @@ namespace BetBuddy
                 // Servers count status
                 new DiscordActivity($"on {serversCount} servers", ActivityType.Playing),
             };
-
+             
             //  loop through activities
             int index = 0;
             while (true)
             {
+                lotteryPool = db.GetTotalLotteryAmountAsync().Result;
+                lotteryCloseTime = await GetNextLotteryCloseTimeAsync();
+                timeRemaining = lotteryCloseTime - DateTime.Now;
+                timeRemainingFormatted = $"{timeRemaining.Hours}h {timeRemaining.Minutes}m";
+                serversCount = _discord.Guilds.Count;
+
                 await _discord.UpdateStatusAsync(activities[index], UserStatus.Online);
                 index = (index + 1) % activities.Count;
                 await Task.Delay(60000); // every 60 seconds switch activity
