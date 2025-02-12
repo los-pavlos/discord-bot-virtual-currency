@@ -18,12 +18,12 @@ namespace BetBuddy
         private readonly CommandsNextExtension _commands;
         private readonly IScheduler _scheduler;
 
-
         public BotService()
         {
             // token loading
             DotEnv.Load();
             string? token = Environment.GetEnvironmentVariable("DISCORD_TOKEN");
+
             if (string.IsNullOrEmpty(token))
             {
                 Console.WriteLine("❌ ERROR: Discord token not found!");
@@ -41,7 +41,7 @@ namespace BetBuddy
             // setup commands
             _commands = _discord.UseCommandsNext(new CommandsNextConfiguration()
             {
-                StringPrefixes = new[] { "bb "},
+                StringPrefixes = new[] { "bb " },
                 IgnoreExtraArguments = true,
                 EnableDefaultHelp = false
             });
@@ -51,8 +51,6 @@ namespace BetBuddy
             // initialize scheduler
             _scheduler = new StdSchedulerFactory().GetScheduler().Result;
             _scheduler.JobFactory = new LotteryJobFactory(_discord);
-
-
         }
 
         public async Task StartAsync()
@@ -74,8 +72,11 @@ namespace BetBuddy
                 .WithIdentity("LotteryJob", "group1")
                 .Build();
 
+            //  trigger it now, and then repeat every day at 20:00
+
             var trigger = TriggerBuilder.Create()
                 .WithIdentity("LotteryTrigger", "Group1")
+                //.WithCronSchedule("0/10 * * * * ?")  // every 10 seconds (for testing)
                 .WithCronSchedule("0 0 20 * * ?")  // every day at 20:00
                 .Build();
 
@@ -128,7 +129,7 @@ namespace BetBuddy
                 // Create a list of activities
                 var activities = new List<DiscordActivity>
                 {
-                    new DiscordActivity($"lottery in {timeRemainingFormatted} with {lotteryPool} coins", ActivityType.Playing),
+                    new DiscordActivity($"lottery in {timeRemainingFormatted} with {lotteryPool:N0} coins", ActivityType.Playing),
                     new DiscordActivity($"on {serversCount} servers", ActivityType.Playing),
                 };
 

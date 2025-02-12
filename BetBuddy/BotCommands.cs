@@ -40,7 +40,7 @@ namespace BetBuddy
             ulong userId = ctx.User.Id;
             Database db = new Database();
             long balance = await db.GetBalanceAsync(userId);
-            await ctx.RespondAsync($"💰 <@{userId}>, your current balance is: **{balance}** coins.");
+            await ctx.RespondAsync($"💰 <@{userId}>, your current balance is: **{balance:N0}** coins.");
             Console.WriteLine($"User {userId} checked their balance.");
         }
 
@@ -74,7 +74,7 @@ namespace BetBuddy
             long balance = await db.GetBalanceAsync(userId);
             if (balance < amount)
             {
-                await ctx.RespondAsync($"⚠️ You don't have enough money. Your curent balance is {balance}");
+                await ctx.RespondAsync($"⚠️ You don't have enough money. Your curent balance is {balance:NO}");
                 return;
             }
             balance -= amount;
@@ -89,7 +89,7 @@ namespace BetBuddy
             // mention the player
             var mention = $"<@{playerId}>";
             // send response
-            await ctx.RespondAsync($"✅ **{amount}** coins have been sent to {mention}.\nNew balance: **{newBalance}** coins.");
+            await ctx.RespondAsync($"✅ **{amount:N0}** coins have been sent to {mention}.\nNew balance: **{newBalance:N0}** coins.");
         }
 
 
@@ -131,7 +131,7 @@ namespace BetBuddy
             var mention = $"<@{playerId}>";
 
             // send response
-            await ctx.RespondAsync($"✅ **{amount}** coins have been added to {mention}'s balance.\nNew balance: **{newBalance}** coins.");
+            await ctx.RespondAsync($"✅ **{amount:N0}** coins have been added to {mention}'s balance.\nNew balance: **{newBalance:N0}** coins.");
         }
 
         private static string GetTimeRemainingUntilLottery()
@@ -181,7 +181,7 @@ namespace BetBuddy
 
                 if (playerBalance < bet)
                 {
-                    await ctx.RespondAsync($"⚠️ <@{userId}>, you don't have enough coins to bet that amount. Your current balance is **{playerBalance}** coins.");
+                    await ctx.RespondAsync($"⚠️ <@{userId}>, you don't have enough coins to bet that amount. Your current balance is **{playerBalance:N0}** coins.");
                     return;
                 }
 
@@ -189,7 +189,7 @@ namespace BetBuddy
                 ulong guildId = ctx.Guild.Id;
                 ulong channelId = ctx.Channel.Id;
                 await db.AddToLotteryAsync(userId, bet, guildId, channelId);
-                Console.WriteLine($"User {userId} entered the lottery with {bet} coins.");
+                Console.WriteLine($"User {userId} entered the lottery with {bet:N0} coins.");
 
                 // Update balance
                 await db.UpdateBalanceAsync(userId, playerBalance - bet);
@@ -200,7 +200,7 @@ namespace BetBuddy
             var entries = await db.GetLotteryEntriesAsync();
             Console.WriteLine($"Entries Count: {entries.Count}");
             var totalAmount = await db.GetTotalLotteryAmountAsync();
-            Console.WriteLine($"Total Amount in Lottery: {totalAmount}");
+            Console.WriteLine($"Total Amount in Lottery: {totalAmount:N0}");
 
             // Prepare message
             if (entries.Count == 0)
@@ -213,13 +213,13 @@ namespace BetBuddy
             string participantsMessage = $"🎉 Current Lottery Participants **({entries.Count})**:\n";
             foreach (var entry in entries)
             {
-                Console.WriteLine($"UserId: {entry.UserId}, Username: {entry.Username}, Amount: {entry.Amount}");
+                Console.WriteLine($"UserId: {entry.UserId}, Username: {entry.Username}, Amount: {entry.Amount:N0}");
                 double chance = (double)entry.Amount / totalAmount * 100;
-                participantsMessage += $"- **{entry.Username}**: {entry.Amount} coins | **{chance:F2}%** chance\n";
+                participantsMessage += $"- **{entry.Username}**: {entry.Amount:N0} coins | **{chance:F2}%** chance\n";
             }
 
             var timeRemaining = GetTimeRemainingUntilLottery();
-            participantsMessage += $"Total Lottery Pool: **{totalAmount}** coins. ({timeRemaining} remaining)";
+            participantsMessage += $"Total Lottery Pool: **{totalAmount:N0}** coins. ({timeRemaining} remaining)";
 
             // Send message
             await ctx.RespondAsync(participantsMessage);
@@ -251,8 +251,8 @@ namespace BetBuddy
                 await db.UpdateBalanceAsync(userId, newBalance);
                 await db.UpdateLastClaimedAsync(userId);
 
-                await ctx.RespondAsync($"🎉 {ctx.User.Username}, you claimed your daily reward of **{reward}** coins! New balance: **{newBalance}** coins.");
-                Console.WriteLine($"User {userId}: {username} claimed daily reward of {reward} coins.");
+                await ctx.RespondAsync($"🎉 {ctx.User.Username}, you claimed your daily reward of **{reward:N0}** coins! New balance: **{newBalance:N0}** coins.");
+                Console.WriteLine($"User {userId}: {username} claimed daily reward of {reward:N0} coins.");
             }
             else
             {
@@ -282,7 +282,7 @@ namespace BetBuddy
                 long newBalance = currentBalance + reward;
                 await db.UpdateBalanceAsync(userId, newBalance);
 
-                await ctx.RespondAsync($"💼 **{ctx.User.Username}**, you worked hard and earned **{reward}** coins! ✨ Your new balance is: **{newBalance}** coins. 🏅");
+                await ctx.RespondAsync($"💼 **{ctx.User.Username}**, you worked hard and earned **{reward:N0}** coins! ✨ Your new balance is: **{newBalance:N0}** coins. 🏅");
                 Console.WriteLine("User {userId}: {username} worked and earned {reward} coins.");
             }
             else
@@ -321,7 +321,7 @@ namespace BetBuddy
             // check if player has enough balance
             if (playerBalance < betAmount || playerBalance == 0)
             {
-                await ctx.RespondAsync($"⚠️ {username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
+                await ctx.RespondAsync($"⚠️ {username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance:N0}** coins.");
                 return;
             }
 
@@ -343,24 +343,24 @@ namespace BetBuddy
             if (betChoice == coinResult)
             {
                 //  player wins
-                long winnings = betAmount * 2; // double the bet amount
+                long winnings = betAmount; // double the bet amount
                 playerBalance += winnings;
-                resultMessage += $"🎉 You win! You received **{winnings}** coins.";
+                resultMessage += $"🎉 You win! You received **{winnings:N0}** coins.";
             }
             else
             {
                 // player loses
                 playerBalance -= betAmount;
-                resultMessage += $"❌ You lose! You lost **{betAmount}** coins.";
+                resultMessage += $"❌ You lose! You lost **{betAmount:N0}** coins.";
             }
 
             // update player balance
             await db.UpdateBalanceAsync(userId, playerBalance);
-            resultMessage += $" Your new balance is: **{playerBalance}** coins.";
+            resultMessage += $" Your new balance is: **{playerBalance:N0}** coins.";
 
             // send result message
             await ctx.RespondAsync(resultMessage);
-            Console.WriteLine($"User {userId}: {username} played coinflip with {betAmount} coins");
+            Console.WriteLine($"User {userId}: {username} played coinflip with {betAmount:N0} coins");
         }
 
         [Command("rps")]
@@ -393,7 +393,7 @@ namespace BetBuddy
 
             if (playerBalance < bet)
             {
-                await ctx.RespondAsync($"⚠️ {ctx.User.Username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
+                await ctx.RespondAsync($"⚠️ {ctx.User.Username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance:N0}** coins.");
                 return;
             }
 
@@ -435,12 +435,12 @@ namespace BetBuddy
 
             await db.UpdateBalanceAsync(userId, playerBalance);
 
-            string message = $"You chose: **{playerChoice.ToLower()}** with **{bet}** coins bet\n" +
+            string message = $"You chose: **{playerChoice.ToLower()}** with **{bet:N0}** coins bet\n" +
                              $"Computer chose: **{computerChoice}**\n" +
                              $"{result}\n" +
-                             $"Your new balance is: **{playerBalance}** coins.";
+                             $"Your new balance is: **{playerBalance:N0}** coins.";
             await ctx.RespondAsync(message);
-            Console.WriteLine($"User {userId}: {username} played rock-paper-scissors with {bet} coins");
+            Console.WriteLine($"User {userId}: {username} played rock-paper-scissors with {bet:N0} coins");
         }
 
         [Command("leaderboard")]
@@ -466,7 +466,7 @@ namespace BetBuddy
             int rank = 1;
             foreach (var player in topPlayers)
             {
-                leaderboardMessage += $"{rank}. **{player.Username}**: {player.Balance} coins\n";
+                leaderboardMessage += $"{rank}. **{player.Username}**: {player.Balance:N0} coins\n";
                 rank++;
                 if (rank > 10) break;
             }
@@ -526,7 +526,7 @@ namespace BetBuddy
 
             if (playerBalance < betAmount || playerBalance == 0)
             {
-                await ctx.RespondAsync($"⚠️ {ctx.User.Username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance}** coins.");
+                await ctx.RespondAsync($"⚠️ {ctx.User.Username}, you don't have enough virtual currency to place that bet. Your current balance is **{playerBalance:N0}** coins.");
                 return;
             }
 
@@ -554,19 +554,19 @@ namespace BetBuddy
             int rolledNumber = rand.Next(37);
             string rolledColor = colors[rolledNumber];
 
-            string resultMessage = $"🎡 The roulette wheel spins... **{rolledNumber}** ({rolledColor})! ";
+            string resultMessage = $"🎡 The roulette wheel spins... **{rolledNumber}** :{rolledColor}_circle:! ";
 
             if (isNumberBet && betNumber == rolledNumber)
             {
                 long winnings = betAmount * 35;
                 playerBalance += winnings;
-                resultMessage += $"🎉 **Jackpot!** You win **{winnings}💰**!";
+                resultMessage += $"🎉 **Jackpot!** You win **{winnings:NO}💰**!";
             }
             else if (!isNumberBet && betType == rolledColor)
             {
                 long winnings = (betType == "green") ? betAmount * 35 : betAmount * 2;
                 playerBalance += winnings;
-                resultMessage += $"✅ You win **{winnings}💰**!";
+                resultMessage += $"✅ You win **{winnings:NO}💰**!";
             }
             else
             {
@@ -578,7 +578,7 @@ namespace BetBuddy
             resultMessage += $" Your new balance: **{playerBalance}💰**.";
 
             await ctx.RespondAsync(resultMessage);
-            Console.WriteLine($"User {userId}: {username} played roulette with {betAmount} coins");
+            Console.WriteLine($"User {userId}: {username} played roulette with {betAmount:N0} coins");
 
         }
 

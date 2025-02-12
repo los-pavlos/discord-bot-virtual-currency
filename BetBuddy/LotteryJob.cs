@@ -3,6 +3,7 @@ using DSharpPlus.Entities;
 using Quartz;
 using System;
 using System.Collections.Generic;
+using System.Reflection.Metadata;
 using System.Threading.Tasks;
 
 namespace BetBuddy
@@ -64,9 +65,27 @@ namespace BetBuddy
                     var guild = await _discord.GetGuildAsync(entry.GuildId);
                     var channel = guild?.GetChannel(entry.ChannelId);
 
-                    if (channel != null)
+                    if (guild is not null && channel is not null)
                     {
-                        await channel.SendMessageAsync($"🎉 Congratulations, <@{entry.UserId}>! You have won the lottery and received **{totalAmount}** coins!");
+
+
+                        var embed = new DiscordEmbedBuilder
+                        {
+                            Title = "🎉 Lottery Winner",
+                            Color = DiscordColor.Blue
+                        }
+                        .AddField(":partying_face: :partying_face: :partying_face: :partying_face: :partying_face: ",
+                        $"🎉 Congratulations, <@{entry.UserId}>!\nYou have won the lottery and received **{totalAmount:N0}** coins!>\n")
+                        .AddField("Your chance to win was", $"{entry.Amount} / {totalAmount} = {Math.Round((double)entry.Amount / totalAmount * 100, 2)}%")
+                        .AddField("Total participants", entries.Count.ToString());
+
+
+
+
+
+                        //  send embed to the channel
+
+                        await channel.SendMessageAsync(embed: embed);
 
                         Console.WriteLine($"Sent message to channel {channel.Name} on guild {guild.Name}");
                     }
