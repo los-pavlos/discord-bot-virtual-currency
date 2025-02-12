@@ -10,12 +10,11 @@ This is a Discord bot that allows users to play games and earn virtual currency 
 
 #### Gamble
 - **bb cf `<bet>`**: Play coin flip with a specified bet.
-- **bb lottery `[amount]`**: Enter the lottery or view current participants.
+- **bb lottery `[amount]`**: Enter the lottery or view current participants. (drawn daily)
 - **bb rps `<choice>` `<bet>`**: Play rock-paper-scissors (choose rock, paper, or scissors and place a bet).
 
 #### Admin commands
 - **bb addmoney `<player>` `<amount>`**: Add money to a player's balance.
-- **bb drawlottery**: Draw the lottery winner.
   
 ## Installation
 
