@@ -131,6 +131,7 @@ namespace BetBuddy
                 {
                     new DiscordActivity($"lottery in {timeRemainingFormatted} with {lotteryPool:N0} coins", ActivityType.Playing),
                     new DiscordActivity($"on {serversCount} servers", ActivityType.Playing),
+                    new DiscordActivity($"bb help", ActivityType.ListeningTo)
                 };
 
                 // Switch activities
