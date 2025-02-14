@@ -76,8 +76,8 @@ namespace BetBuddy
                             Color = DiscordColor.Blue
                         }
                         .AddField(":partying_face: :partying_face: :partying_face: :partying_face: :partying_face: ",
-                        $"🎉 Congratulations, <@{entry.UserId}>!\nYou have won the lottery and received **{totalAmount:N0}** coins!>\n")
-                        .AddField("Your chance to win was", $"{entry.Amount} / {totalAmount} = {Math.Round((double)entry.Amount / totalAmount * 100, 2)}%")
+                        $"🎉 Congratulations, <@{entry.UserId}>!\nYou have won the lottery and received **{totalAmount:N0}** coins!\n")
+                        .AddField("Your chance to win was", $"{entry.Amount} / {totalAmount} = **{Math.Round((double)entry.Amount / totalAmount * 100, 2)}%**")
                         .AddField("Total participants", entries.Count.ToString());
 
 
