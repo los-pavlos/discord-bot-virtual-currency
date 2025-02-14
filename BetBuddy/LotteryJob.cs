@@ -22,6 +22,7 @@ namespace BetBuddy
             Console.WriteLine("Running automatic lottery draw...");
 
             var db = new Database();
+           
             var entries = await db.GetLotteryEntriesAsync();
 
             if (entries.Count >= 1)

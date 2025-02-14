@@ -19,6 +19,8 @@ namespace BetBuddy
         ulong adminId = 409818422344417293;  // Admin ID
 
 
+
+
         [Command("help")]
         public async Task Help(CommandContext ctx)
         {
@@ -29,8 +31,10 @@ namespace BetBuddy
             }
             .AddField("💰 Economy", "`bb money` - Check your balance\n`bb daily` - Claim your daily reward\n`bb work` - Claim your work reward\n`bb leaderboard` - Check top 10 richest players")
             .AddField("🎮 Games", "`bb rps <choice> <bet>` - Rock Paper Scissors\n`bb cf <bet>` - Coin Flip\n`bb roulette <choice> <bet>` - Roulette")
-            .AddField("🎟 Lottery", "`bb lottery <amount>` - Join the lottery (drawn daily)");
+            .AddField("🎟 Lottery", "`bb lottery <amount>` - Join the lottery (drawn daily)")
+            .AddField("🔗 Invite", "[Click here to invite the bot](https://discord.com/oauth2/authorize?client_id=1336641695575572490&permissions=277025459200&integration_type=0&scope=bot)");
 
+        
             await ctx.RespondAsync(embed);
         }
 
@@ -96,6 +100,14 @@ namespace BetBuddy
         [Command("addmoney")]
         public async Task AddMoney(CommandContext ctx, string playerMention, long amount)
         {
+
+            if (ctx.User.Id != adminId)
+            {
+                await ctx.RespondAsync("⚠️ You do not have permission to perform this action.");
+                return;
+            }
+
+            
             if (amount <= 0)
             {
                 await ctx.RespondAsync("⚠️ Please enter a valid amount greater than zero.");
@@ -168,6 +180,11 @@ namespace BetBuddy
                 if (amount == "all")
                 {
                     bet = playerBalance;
+                    if(bet == 0)
+                    {
+                        await ctx.RespondAsync("⚠️ You don't have any coins to enter the lottery.");
+                        return;
+                    }
                 }
                 else if (!long.TryParse(amount, out long betAmount) || betAmount <= 0)
                 {
