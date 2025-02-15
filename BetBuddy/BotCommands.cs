@@ -9,6 +9,7 @@ using DSharpPlus.VoiceNext;
 using DSharpPlus.Entities;
 using YoutubeExplode;
 using YoutubeExplode.Videos.Streams;
+using System.Collections.Concurrent;
 
 namespace BetBuddy
 {
@@ -18,12 +19,54 @@ namespace BetBuddy
 
         ulong adminId = 409818422344417293;  // Admin ID
 
+        //  dictionary to store the last time a command was used by a user
+        private static Dictionary<(ulong, string), DateTime> LastCommandUsage = new();
+        private static Dictionary<string, TimeSpan> CommandCooldowns = new()
+        {
+            { "work", TimeSpan.FromSeconds(60) } // work command can be used once per minute
+        };
+        private static TimeSpan DefaultCooldown = TimeSpan.FromSeconds(5);
 
+        private async Task<bool> CheckCooldown(CommandContext ctx, string commandName)
+        {
+            var key = (ctx.User.Id, commandName);
+
+            // use specified cooldown if it exists, otherwise use the default cooldown
+            TimeSpan cooldownDuration = CommandCooldowns.ContainsKey(commandName)
+                ? CommandCooldowns[commandName]
+                : DefaultCooldown;
+
+            if (LastCommandUsage.TryGetValue(key, out DateTime lastUsed))
+            {
+                TimeSpan elapsed = DateTime.UtcNow - lastUsed;
+                if (elapsed < cooldownDuration)
+                {
+                    double remaining = (cooldownDuration - elapsed).TotalSeconds;
+                    var cooldownMsg = await ctx.RespondAsync($"⏳ Please wait **{remaining:N0}** seconds before using `{commandName}` again...");
+
+                    while (remaining > 0)
+                    {
+                        await Task.Delay(1000);
+                        remaining--;
+                        await cooldownMsg.ModifyAsync($"⏳ Please wait **{remaining:F1}** seconds before using `{commandName}` again...");
+                    }
+
+                    await cooldownMsg.DeleteAsync();
+                    return false; // cooldown hasn't expired yet
+                }
+            }
+
+            // cooldown has expired, update the last command usage
+            LastCommandUsage[key] = DateTime.UtcNow;
+            return true;
+        }
 
 
         [Command("help")]
         public async Task Help(CommandContext ctx)
         {
+            if (!await CheckCooldown(ctx, "help")) return; // command cooldown
+
             var embed = new DiscordEmbedBuilder
             {
                 Title = "📜 Available Commands",
@@ -41,6 +84,8 @@ namespace BetBuddy
         [Command("money")]
         public async Task Money(CommandContext ctx)
         {
+            if (!await CheckCooldown(ctx, "money")) return; // command cooldown
+
             ulong userId = ctx.User.Id;
             Database db = new Database();
             long balance = await db.GetBalanceAsync(userId);
@@ -52,6 +97,8 @@ namespace BetBuddy
         [Command("give")]
         public async Task Give(CommandContext ctx, string playerMention, long amount)
         {
+            if (!await CheckCooldown(ctx, "give")) return; // command cooldown
+
             if (amount <= 0)
             {
                 await ctx.RespondAsync("⚠️ Please enter a valid amount greater than zero.");
@@ -100,6 +147,7 @@ namespace BetBuddy
         [Command("addmoney")]
         public async Task AddMoney(CommandContext ctx, string playerMention, long amount)
         {
+            if (!await CheckCooldown(ctx, "addmoney")) return; // command cooldown
 
             if (ctx.User.Id != adminId)
             {
@@ -162,6 +210,8 @@ namespace BetBuddy
         [Command("lottery")]
         public async Task Lottery(CommandContext ctx, string? amount = null)
         {
+            if (!await CheckCooldown(ctx, "lottery")) return; // command cooldown
+
             ulong userId = ctx.User.Id;
             string username = ctx.User.Username;
             Database db = new Database();
@@ -246,41 +296,78 @@ namespace BetBuddy
         [Command("daily")]
         public async Task Daily(CommandContext ctx)
         {
-            ulong userId = ctx.User.Id;  // Get Discord User ID
-            string username = ctx.User.Username;  // Get Discord Username
+
+            if (!await CheckCooldown(ctx, "daily")) return; // command cooldown
+
+            ulong userId = ctx.User.Id;
+            string username = ctx.User.Username;
             Database db = new Database();
 
             if (!await db.PlayerExistsAsync(userId))
             {
-                await db.AddPlayerAsync(userId, username); // Use userId instead of username
+                await db.AddPlayerAsync(userId, username);
             }
 
-            DateTime? lastClaimed = await db.GetLastClaimedAsync(userId);
-            DateTime today = DateTime.UtcNow.Date;
+            // set timezone to CET
+            TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
+            DateTime nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+            DateTime todayLocal = nowLocal.Date;
 
-            if (!lastClaimed.HasValue || lastClaimed.Value.Date < today)
+            DateTime? lastClaimed = await db.GetLastClaimedAsync(userId);
+            int streak = await db.GetDailyStreakAsync(userId);
+
+            if (!lastClaimed.HasValue || lastClaimed.Value.Date < todayLocal)
             {
+                // if the user claimed yesterday, increment the streak
+                if (lastClaimed.HasValue && (todayLocal - lastClaimed.Value.Date).Days == 1)
+                {
+                    streak++;
+                }
+                else
+                {
+                    streak = 1; // streak reset
+                }
+
                 Random random = new Random();
-                long reward = random.Next(500, 1501); // Reward between 500 and 1500
+                long baseReward = random.Next(500, 1501); // random reward between 500 and 1500
+                double bonusMultiplier = 1 + (streak * 0.05); // 5% bonus for each day of streak
+                long bonus = (long)(baseReward * (streak * 0.1)); // bonus reward
+                long totalReward = baseReward + bonus; // total reward
+
                 long currentBalance = await db.GetBalanceAsync(userId);
-                long newBalance = currentBalance + reward;
+                long newBalance = currentBalance + totalReward;
 
                 await db.UpdateBalanceAsync(userId, newBalance);
                 await db.UpdateLastClaimedAsync(userId);
+                await db.UpdateDailyStreakAsync(userId, streak);
 
-                await ctx.RespondAsync($"🎉 {ctx.User.Username}, you claimed your daily reward of **{reward:N0}** coins! New balance: **{newBalance:N0}** coins.");
-                Console.WriteLine($"User {userId}: {username} claimed daily reward of {reward:N0} coins.");
+                // detail message
+                await ctx.RespondAsync($@"🎉 **{ctx.User.Username}, you claimed your daily reward!**  
+💰 **Base Reward:** {baseReward:N0} coins  
+🔥 **Streak Bonus ({streak} days):** {bonus:N0} coins  
+📈 **Total Reward:** {totalReward:N0} coins  
+🏦 **New Balance:** {newBalance:N0} coins
+");
+
+                Console.WriteLine($"User {userId}: {username} claimed {totalReward:N0} coins (streak: {streak}, base: {baseReward}, bonus: {bonus}).");
             }
             else
             {
-                var remainingTime = today.AddDays(1) - DateTime.UtcNow;
-                await ctx.RespondAsync($"⚠️ {ctx.User.Username}, you can claim your daily reward again tomorrow at midnight! Remaining time: **{remainingTime:hh\\:mm\\:ss}**.");
+                // Výpočet zbývajícího času do půlnoci CET
+                DateTime nextMidnight = todayLocal.AddDays(1);
+                TimeSpan remainingTime = nextMidnight - nowLocal;
+                string formattedTime = $"{remainingTime.Hours:D2}:{remainingTime.Minutes:D2}:{remainingTime.Seconds:D2}";
+
+                await ctx.RespondAsync($"⚠️ {ctx.User.Username}, you can claim your daily reward again tomorrow at midnight! Remaining time: **{formattedTime}**.\nYour daily streak is **{streak} days** 🔥");
             }
         }
 
         [Command("work")]
         public async Task Work(CommandContext ctx)
         {
+
+            if (!await CheckCooldown(ctx, "work")) return; // command cooldown
+
             ulong userId = ctx.User.Id;
             string username = ctx.User.Username;
             Database db = new Database();
@@ -304,13 +391,16 @@ namespace BetBuddy
             }
             else
             {
-                await ctx.RespondAsync($"⚠️ **{ctx.User.Username}**, you can't work if you already have money. 💰 But don't worry, you can still try your luck in the casino! 🎰");
+                await ctx.RespondAsync($"⚠️ **{ctx.User.Username}**, you can't work if you already have money. 💰 But don't worry, you can still try your luck in the casino with your **{currentBalance}** coins! 🎰");
             }
         }
 
         [Command("cf")]
         public async Task Coinflip(CommandContext ctx, string betAmountString)
         {
+
+            if (!await CheckCooldown(ctx, "cf")) return; // command cooldown
+
             ulong userId = ctx.User.Id;
             string username = ctx.User.Username;
             Database db = new Database();
@@ -383,6 +473,8 @@ namespace BetBuddy
         [Command("rps")]
         public async Task RPS(CommandContext ctx, string playerChoice, string betString)
         {
+            if (!await CheckCooldown(ctx, "rps")) return; // command cooldown
+
             ulong userId = ctx.User.Id;
             string username = ctx.User.Username;
             Database db = new Database();
@@ -463,6 +555,9 @@ namespace BetBuddy
         [Command("leaderboard")]
         public async Task Leaderboard(CommandContext ctx)
         {
+
+            if (!await CheckCooldown(ctx, "leaderboard")) return; // command cooldown
+
             ulong userId = ctx.User.Id;
             string username = ctx.User.Username;
             Database db = new Database();
@@ -519,6 +614,8 @@ namespace BetBuddy
         [Command("roulette")]
         public async Task Roulette(CommandContext ctx, string betType, string betAmountString)
         {
+            if (!await CheckCooldown(ctx, "roulette")) return; // command cooldown
+
             ulong userId = ctx.User.Id;
             string username = ctx.User.Username;
             Database db = new Database();
@@ -598,6 +695,9 @@ namespace BetBuddy
             Console.WriteLine($"User {userId}: {username} played roulette with {betAmount:N0} coins");
 
         }
+
+
+
 
     }
 }

@@ -23,27 +23,51 @@ public class Database
 
             var playersTableCommand = new SQLiteCommand(
                 @"CREATE TABLE IF NOT EXISTS Players (
-                    UserId INTEGER PRIMARY KEY,
-                    Username string,
-                    Balance BIGINT,
-                    LastClaimed DATETIME)",
-                connection);
+                UserId INTEGER PRIMARY KEY,
+                Username STRING,
+                Balance BIGINT,
+                LastClaimed DATETIME
+            )", connection);
             playersTableCommand.ExecuteNonQuery();
 
             var lotteryTableCommand = new SQLiteCommand(
                 @"CREATE TABLE IF NOT EXISTS LotteryEntries (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    UserId INTEGER,
-                    Amount BIGINT,
-                    GuildId BIGINT,   -- ID serveru (guild)
-                    ChannelId BIGINT, -- ID kanálu
-                    EntryTime DATETIME,
-                    FOREIGN KEY (UserId) REFERENCES Players(UserId))
-                ",
-                connection);
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                UserId INTEGER,
+                Amount BIGINT,
+                GuildId BIGINT,
+                ChannelId BIGINT,
+                EntryTime DATETIME,
+                FOREIGN KEY (UserId) REFERENCES Players(UserId)
+            )", connection);
             lotteryTableCommand.ExecuteNonQuery();
+
+            // Přidání sloupce DailyStreak, pokud neexistuje
+            var checkColumnCommand = new SQLiteCommand(
+                "PRAGMA table_info(Players);", connection);
+
+            using (var reader = checkColumnCommand.ExecuteReader())
+            {
+                bool columnExists = false;
+                while (reader.Read())
+                {
+                    if (reader["name"].ToString() == "DailyStreak")
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+
+                if (!columnExists)
+                {
+                    var alterTableCommand = new SQLiteCommand(
+                        "ALTER TABLE Players ADD COLUMN DailyStreak INTEGER DEFAULT 0;", connection);
+                    alterTableCommand.ExecuteNonQuery();
+                }
+            }
         }
     }
+
 
     //  Leaderboard / TOP 10
     public async Task<List<(string Username, long Balance)>> GetTopPlayersAsync()
@@ -196,7 +220,30 @@ public class Database
         }
     }
 
+    public async Task UpdateDailyStreakAsync(ulong userId, int streak)
+    {
+        using (var connection = new SQLiteConnection(connectionString))
+        {
+            await connection.OpenAsync();
+            var command = new SQLiteCommand("UPDATE Players SET DailyStreak = @streak WHERE UserId = @userId", connection);
+            command.Parameters.AddWithValue("@streak", streak);
+            command.Parameters.AddWithValue("@userId", userId);
+            await command.ExecuteNonQueryAsync();
+        }
+    }
 
+
+    public async Task<int> GetDailyStreakAsync(ulong userId)
+    {
+        using (var connection = new SQLiteConnection(connectionString))
+        {
+            await connection.OpenAsync();
+            var command = new SQLiteCommand("SELECT DailyStreak FROM Players WHERE UserId = @userId", connection);
+            command.Parameters.AddWithValue("@userId", userId);
+            var result = await command.ExecuteScalarAsync();
+            return result == DBNull.Value ? 0 : Convert.ToInt32(result);
+        }
+    }
 
     // LOTTERY  
     public async Task AddToLotteryAsync(ulong userId, long amount, ulong guildId, ulong channelId)
