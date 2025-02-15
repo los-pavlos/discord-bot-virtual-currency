@@ -26,7 +26,8 @@ public class Database
                 UserId INTEGER PRIMARY KEY,
                 Username STRING,
                 Balance BIGINT,
-                LastClaimed DATETIME
+                LastClaimed DATETIME,
+                DailyStreak INTEGER DEFAULT 0
             )", connection);
             playersTableCommand.ExecuteNonQuery();
 
@@ -37,34 +38,12 @@ public class Database
                 Amount BIGINT,
                 GuildId BIGINT,
                 ChannelId BIGINT,
-                EntryTime DATETIME,
+                EntryTime DATETIME,  
                 FOREIGN KEY (UserId) REFERENCES Players(UserId)
             )", connection);
             lotteryTableCommand.ExecuteNonQuery();
 
-            // Přidání sloupce DailyStreak, pokud neexistuje
-            var checkColumnCommand = new SQLiteCommand(
-                "PRAGMA table_info(Players);", connection);
 
-            using (var reader = checkColumnCommand.ExecuteReader())
-            {
-                bool columnExists = false;
-                while (reader.Read())
-                {
-                    if (reader["name"].ToString() == "DailyStreak")
-                    {
-                        columnExists = true;
-                        break;
-                    }
-                }
-
-                if (!columnExists)
-                {
-                    var alterTableCommand = new SQLiteCommand(
-                        "ALTER TABLE Players ADD COLUMN DailyStreak INTEGER DEFAULT 0;", connection);
-                    alterTableCommand.ExecuteNonQuery();
-                }
-            }
         }
     }
 
