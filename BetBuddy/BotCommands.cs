@@ -7,8 +7,7 @@ using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Lavalink;
 using DSharpPlus.VoiceNext;
 using DSharpPlus.Entities;
-using YoutubeExplode;
-using YoutubeExplode.Videos.Streams;
+
 using System.Collections.Concurrent;
 
 namespace BetBuddy

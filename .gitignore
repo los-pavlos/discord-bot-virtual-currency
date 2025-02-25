@@ -11,9 +11,7 @@
 *.sln.docstates
 
 
-
-
-
+BetBuddy.sln
 .env
 players.db
 players.db-shm
