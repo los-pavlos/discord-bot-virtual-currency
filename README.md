@@ -56,7 +56,7 @@ After you’ve set up your .env file and installed the dependencies, you can run
 
 ```bash
 dotnet run
-```
+``` 
 This will start the bot and it will connect to Discord. The bot should now be online and ready to interact with users in your Discord server.
 
 ### Database
