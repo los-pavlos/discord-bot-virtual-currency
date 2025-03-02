@@ -18,13 +18,6 @@ This is a Discord bot that allows users to play games and earn virtual currency 
   
 ## Installation
 
-### Prerequisites
-
-Make sure you have the following installed:
-
-- [.NET SDK](https://dotnet.microsoft.com/download) (version 6 or above)
-- [SQLite](https://www.sqlite.org/download.html)
-
 ### Install the Required Packages
 
 Install the necessary dependencies using the following commands in your project directory:
@@ -38,7 +31,6 @@ dotnet add package Newtonsoft.Json
 ```
 
 ### Setting Up the Bot
-Clone this repository or download the project files.
 
 Create a .env file in the root of the project directory.
 
