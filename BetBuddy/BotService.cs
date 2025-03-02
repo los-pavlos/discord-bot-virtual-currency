@@ -2,7 +2,6 @@
 using DSharpPlus;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.Entities;
-
 using DSharpPlus.Net;
 using Quartz;
 using Quartz.Impl;
@@ -14,9 +13,11 @@ namespace BetBuddy
 {
     public class BotService
     {
-        private readonly DiscordClient _discord;
-        private readonly CommandsNextExtension _commands;
-        private readonly IScheduler _scheduler;
+        // = null! because we know it will be initialized in the constructor and it will avoid null reference exceptions warnings
+        private readonly DiscordClient _discord = null!;
+        private readonly CommandsNextExtension _commands = null!;
+        private readonly IScheduler _scheduler = null!;
+
 
         public BotService()
         {
@@ -63,16 +64,11 @@ namespace BetBuddy
             await UpdateActivityLoop();
         }
 
-
-
-
         private async Task ScheduleLotteryJob()
         {
             IJobDetail job = JobBuilder.Create<LotteryJob>()
                 .WithIdentity("LotteryJob", "group1")
                 .Build();
-
-            //  trigger it now, and then repeat every day at 20:00
 
             var trigger = TriggerBuilder.Create()
                 .WithIdentity("LotteryTrigger", "Group1")
@@ -84,6 +80,8 @@ namespace BetBuddy
             await _scheduler.Start();
             Console.WriteLine("✅ LotteryJob planned!");
         }
+
+        //  Check the next lottery close time
         private async Task<DateTime> GetNextLotteryCloseTimeAsync()
         {
             // Create a trigger key
@@ -111,6 +109,7 @@ namespace BetBuddy
             return nextFireTime.Value.LocalDateTime;
         }
 
+        // Loop to update the bot's activity
         private async Task UpdateActivityLoop()
         {
             Database db = new Database();

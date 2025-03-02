@@ -81,9 +81,6 @@ namespace BetBuddy
                         .AddField("Total participants", entries.Count.ToString());
 
 
-
-
-
                         //  send embed to the channel
 
                         await channel.SendMessageAsync(embed: embed);

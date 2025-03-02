@@ -16,6 +16,7 @@ namespace BetBuddy
     {
         private static readonly HttpClient client = new HttpClient();
 
+        //  Here you can add your own Discord ID to make yourself an admin
         ulong adminId = 409818422344417293;  // Admin ID
 
         //  dictionary to store the last time a command was used by a user
@@ -60,6 +61,7 @@ namespace BetBuddy
             return true;
         }
 
+        //  COMMANDS
 
         [Command("help")]
         public async Task Help(CommandContext ctx)
@@ -71,7 +73,7 @@ namespace BetBuddy
                 Title = "📜 Available Commands",
                 Color = DiscordColor.Blue
             }
-            .AddField("💰 Economy", "`bb money` - Check your balance\n`bb daily` - Claim your daily reward\n`bb work` - Claim your work reward\n`bb leaderboard` - Check top 10 richest players")
+            .AddField("💰 Economy", "`bb money` - Check your balance\n`bb daily` - Claim your daily reward\n`bb work` - Claim your work reward\n`bb leaderboard` - Check top 10 richest players\n`bb give <tag> <amount>` - Give tagged player some money")
             .AddField("🎮 Games", "`bb rps <choice> <bet>` - Rock Paper Scissors\n`bb cf <bet>` - Coin Flip\n`bb roulette <choice> <bet>` - Roulette")
             .AddField("🎟 Lottery", "`bb lottery <amount>` - Join the lottery (drawn daily)")
             .AddField("🔗 Invite", "[Click here to invite the bot](https://discord.com/oauth2/authorize?client_id=1336641695575572490&permissions=277025459200&integration_type=0&scope=bot)");
@@ -91,7 +93,6 @@ namespace BetBuddy
             await ctx.RespondAsync($"💰 <@{userId}>, your current balance is: **{balance:N0}** coins.");
             Console.WriteLine($"User {userId} checked their balance.");
         }
-
 
         [Command("give")]
         public async Task Give(CommandContext ctx, string playerMention, long amount)
@@ -141,7 +142,6 @@ namespace BetBuddy
             // send response
             await ctx.RespondAsync($"✅ **{amount:N0}** coins have been sent to {mention}.\nNew balance: **{newBalance:N0}** coins.");
         }
-
 
         [Command("addmoney")]
         public async Task AddMoney(CommandContext ctx, string playerMention, long amount)
@@ -694,9 +694,6 @@ namespace BetBuddy
             Console.WriteLine($"User {userId}: {username} played roulette with {betAmount:N0} coins");
 
         }
-
-
-
 
     }
 }

@@ -9,12 +9,12 @@ public class Database
 {
     private string connectionString = "Data Source=players.db;Version=3;Journal Mode=WAL;Cache Size=5000;";
 
-
     public Database()
     {
         CreateTables();
     }
 
+    //  Create tables
     private void CreateTables()
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -42,11 +42,8 @@ public class Database
                 FOREIGN KEY (UserId) REFERENCES Players(UserId)
             )", connection);
             lotteryTableCommand.ExecuteNonQuery();
-
-
         }
     }
-
 
     //  Leaderboard / TOP 10
     public async Task<List<(string Username, long Balance)>> GetTopPlayersAsync()
@@ -77,8 +74,6 @@ public class Database
         return topPlayers;
     }
 
-
-
     //  Players and balance
     public async Task<bool> PlayerExistsAsync(ulong userId)
     {
@@ -92,6 +87,7 @@ public class Database
         }
     }
 
+    //  Add player
     public async Task AddPlayerAsync(ulong userId, string username)
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -105,6 +101,7 @@ public class Database
         }
     }
 
+    // Check balance
     public async Task<long> GetBalanceAsync(ulong userId)
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -117,6 +114,7 @@ public class Database
         }
     }
 
+    // Update balance
     public async Task UpdateBalanceAsync(ulong userId, long newBalance)
     {
         int maxRetries = 3;
@@ -172,9 +170,7 @@ public class Database
         }
     }
 
-
-
-    //  DAILY REWARDS
+    // Check the date of the last claimed reward
     public async Task<DateTime?> GetLastClaimedAsync(ulong userId)
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -187,6 +183,7 @@ public class Database
         }
     }
 
+    // Update the date of the last claimed reward
     public async Task UpdateLastClaimedAsync(ulong userId)
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -199,6 +196,7 @@ public class Database
         }
     }
 
+    // Update daily streak
     public async Task UpdateDailyStreakAsync(ulong userId, int streak)
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -211,7 +209,7 @@ public class Database
         }
     }
 
-
+    // Check daily streak
     public async Task<int> GetDailyStreakAsync(ulong userId)
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -224,7 +222,7 @@ public class Database
         }
     }
 
-    // LOTTERY  
+    // Add / update lottery entry 
     public async Task AddToLotteryAsync(ulong userId, long amount, ulong guildId, ulong channelId)
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -267,6 +265,7 @@ public class Database
         }
     }
 
+    // Get all lottery entries
     public async Task<List<(ulong UserId, string Username, long Amount, ulong GuildId, ulong ChannelId)>> GetLotteryEntriesAsync()
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -294,7 +293,7 @@ public class Database
         }
     }
 
-    // method to get the total amount of the lottery
+    // Check tottal lottery amount
     public async Task<long> GetTotalLotteryAmountAsync()
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -306,7 +305,7 @@ public class Database
         }
     }
 
-    // method to delete all lottery entries older than a certain date
+    // Delete all lottery entries older than the cutoff date
     public async Task DeleteOldLotteryEntriesAsync(DateTime cutoffDate)
     {
         using (var connection = new SQLiteConnection(connectionString))
@@ -328,7 +327,6 @@ public class Database
             await command.ExecuteNonQueryAsync();
         }
     }
-
 
     //  Remove player
     public async Task RemovePlayerAsync(ulong userId)

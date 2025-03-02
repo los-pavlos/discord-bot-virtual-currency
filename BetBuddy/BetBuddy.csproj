@@ -8,10 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-	  <PackageReference Include="Discord.Net" Version="2.0.0-beta2-00990" />
+	  <PackageReference Include="Discord.Net" Version="2.0.0" />
 	  <PackageReference Include="dotenv.net" Version="3.2.1" />
     <PackageReference Include="DSharpPlus" Version="5.0.0" />
     <PackageReference Include="DSharpPlus.CommandsNext" Version="4.5.0" />
+    <PackageReference Include="DSharpPlus.Interactivity" Version="4.5.0" />
     <PackageReference Include="DSharpPlus.Lavalink" Version="4.5.0" />
     <PackageReference Include="DSharpPlus.VoiceNext" Version="4.5.0" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.1" />

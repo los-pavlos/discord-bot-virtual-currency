@@ -24,6 +24,7 @@ using Microsoft.Extensions.Hosting;
  * Commands:
  * - bb money: Check your balance
  * - bb addmoney <player> <amount>: Add money to a player's balance
+ * - bb bb give <player> <amount>: Give money to a player
  * - bb cf <bet>: Play coin flip
  * - bb lottery [amount]: Enter the lottery or view current participants
  * - bb drawlottery: Draw the lottery winner
@@ -41,10 +42,9 @@ using Microsoft.Extensions.Hosting;
  * To run the bot:
  * 1. Create a .env file
  * 2. Add DISCORD_TOKEN=token to the .env file
+ * 4. Enter your discord id to the AdminId variable in BotCommands.cs
  * 3. Run the program
  */
-
-
 
 
 namespace BetBuddy
@@ -64,12 +64,5 @@ namespace BetBuddy
             await bot.StartAsync(); // Start the bot
             await Task.Delay(-1); // Prevent the application from closing
         }
-       
-
     }
-
-
-
-    
-
 }
